@@ -1,7 +1,7 @@
 :root{--night:#101728;--panel:rgba(23,32,51,.93);--panel2:rgba(28,40,60,.9);--ink:#edf5ff;--ink2:#bbc9dd;--ink3:#96abc3;--cyan:#96dfeb;--magenta:#dc82c7;--line:rgba(156,193,218,.23);--line2:rgba(150,223,235,.5)}
 html{scroll-behavior:smooth;scroll-padding-top:24px}
 body{background:transparent;font-size:15px}
-.cityscape{position:fixed;inset:0;z-index:-2;background:#121a2a url('neon-city.webp') center right/cover no-repeat}
+.cityscape{position:fixed;inset:0;z-index:-2;background:#121a2a url('research-harbor.webp') center right/cover no-repeat}
 .veil{background:linear-gradient(90deg,rgba(12,19,34,.95),rgba(12,19,34,.77) 45%,rgba(12,19,34,.28)),linear-gradient(0deg,rgba(11,17,30,.8),transparent 70%)}
 .wrap{max-width:1320px;padding:38px 40px 80px}
 header{align-items:center;border-bottom:1px solid var(--line);padding-bottom:26px}
