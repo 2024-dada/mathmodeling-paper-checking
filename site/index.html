@@ -251,7 +251,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 
   <section class="card" id="upload">
     <h2><span class="n">1</span>放入论文</h2>
-    <p class="desc">拖入文件或文件夹，也可以点击选择。支持 PDF、TXT、MD、TEX。多篇被测论文会互相比对。</p>
+    <p class="desc">拖入文件或文件夹，也可以点击选择。支持 PDF、DOCX、TXT、MD、TEX。DOCX 提取正文、表格文字和公式文本，不读取图片、页眉页脚或批注。多篇被测论文会互相比对。</p>
     <div class="zones">
       <div class="zone" data-g="papers" tabindex="0">
         <div class="zt">被测论文</div><div class="zh">要检查的论文，可多篇</div>
@@ -266,7 +266,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
         <div class="chips"></div><div class="empty"><b>＋</b>题目 PDF</div>
       </div>
     </div>
-    <input type="file" id="picker" multiple accept=".pdf,.txt,.md,.tex" hidden>
+    <input type="file" id="picker" multiple accept=".pdf,.docx,.txt,.md,.tex" hidden>
   </section>
 
   <section class="card">

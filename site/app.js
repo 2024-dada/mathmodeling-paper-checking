@@ -1,11 +1,12 @@
 import * as E from "./engine.js";
 import { pdfToText } from "./pdftext.js";
 import { reportPdf } from "./reportpdf.js";
+import { docxToText } from "./docxtext.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d) + "%";
-const ALLOWED = /\.(pdf|txt|md|tex)$/i;
+const ALLOWED = /\.(pdf|docx|txt|md|tex)$/i;
 const files = { papers: [], corpus: [], exclude: [] };
 const CAT_COLOR = { disclaimer: "#ff3c8e", contrast: "#ffb000", limitation: "#8f5cff", scope: "#2de2e6", hedge: "#5cf2a6" };
 let mode = "", LEX = null, last = null;
@@ -35,6 +36,7 @@ async function loadPdfjs() {
 async function readDoc(f, isExclude) {
   let raw;
   if (/\.pdf$/i.test(f.name)) raw = await pdfToText(await loadPdfjs(), new Uint8Array(await f.arrayBuffer()));
+  else if (/\.docx$/i.test(f.name)) raw = await docxToText(await f.arrayBuffer());
   else raw = await f.text();
   return E.makeDocument(raw, f.name.replace(/\.[^.]+$/, ""), false, !isExclude);
 }
@@ -47,7 +49,7 @@ function addFiles(g, list) {
     if (files[g].some(x => x.name === f.name && x.size === f.size)) continue;
     files[g].push(f); n++;
   }
-  if (!n && list.length) toast("没有可用的文件（支持 PDF / TXT / MD / TEX）");
+  if (!n && list.length) toast("没有可用的文件（支持 PDF / DOCX / TXT / MD / TEX）");
   render();
 }
 function render() {
