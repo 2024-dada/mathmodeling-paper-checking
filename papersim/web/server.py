@@ -10,6 +10,8 @@ import re
 import tempfile
 import threading
 import traceback
+import urllib.error
+import urllib.request
 import uuid
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,7 +22,9 @@ from ..pipeline import Options, run
 from ..providers import PROVIDERS, detect, test_chat
 from ..report import write_csv, write_html, write_json
 
-STATIC = Path(__file__).with_name("index.html")
+SITE = Path(__file__).resolve().parents[2] / "site"      # 与 GitHub Pages 共用同一个前端
+MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml"}
 ALLOWED = {".pdf", ".txt", ".md", ".tex"}
 JOBS = {}
 MAX_BODY = 300 * 1024 * 1024
@@ -121,6 +125,24 @@ def _job(job_id, payload):
         job["trace"] = traceback.format_exc()
 
 
+def proxy(req):
+    """把页面的 API 请求转发给服务商（本地运行时绕开浏览器跨域限制）。只允许 https 或本机地址。"""
+    url = req.get("url", "")
+    if not (url.startswith("https://") or url.startswith("http://127.0.0.1") or url.startswith("http://localhost")):
+        return {"error": "只允许转发 https 地址"}
+    headers = {k: v for k, v in (req.get("headers") or {}).items() if k.lower() not in ("host", "content-length", "origin")}
+    body = req.get("body")
+    r = urllib.request.Request(url, data=body.encode() if isinstance(body, str) else None,
+                               headers=headers, method=req.get("method", "GET"))
+    try:
+        with urllib.request.urlopen(r, timeout=300) as resp:
+            return {"status": resp.status, "body": resp.read().decode("utf-8", "replace")}
+    except urllib.error.HTTPError as e:
+        return {"status": e.code, "body": e.read().decode("utf-8", "replace")}
+    except Exception as e:
+        return {"error": f"连接失败：{e}"}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
@@ -147,8 +169,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
-        if path in ("/", "/index.html"):
-            return self._send(200, STATIC.read_bytes(), "text/html; charset=utf-8")
+        if path == "/api/ping":
+            return self._send(200, {"papersim": True})
+        if not path.startswith("/api/"):
+            rel = "index.html" if path in ("/", "") else path.lstrip("/")
+            f = (SITE / rel).resolve()
+            if SITE in f.parents and f.is_file():
+                return self._send(200, f.read_bytes(), MIME.get(f.suffix, "application/octet-stream"))
+            if not SITE.exists():
+                return self._send(500, "找不到 site/ 目录，请在仓库目录里用 pip install -e . 安装", "text/plain; charset=utf-8")
         if path == "/api/providers":
             return self._send(200, [{"id": k, "name": v["name"], "base": v["base"]} for k, v in PROVIDERS.items()])
         m = re.fullmatch(r"/api/job/([0-9a-f]+)", path)
@@ -168,6 +197,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             data = self._json()
+            if self.path == "/api/proxy":
+                return self._send(200, proxy(data))
             if self.path == "/api/models":
                 return self._send(200, detect(data.get("key"), data.get("base") or None))
             if self.path == "/api/test":

@@ -143,6 +143,9 @@ def detect(key: str, base: str = None):
                     "chat": [x for x in info["prefer"] if "/" in x or "-" in x], "embed": info.get("embed", []),
                     "other": [], "tried": tried,
                     "error": "没能获取模型列表：" + "；".join(f"{k} {v}" for k, v in tried.items()) + "。可以手动输入模型名"}
+        if base:
+            return {"ok": False, "base_url": base, "tried": tried,
+                    "error": f"无法从 {base} 获取模型列表：" + "；".join(tried.values()) + "。可以手动输入模型名"}
         return {"ok": False, "tried": tried,
                 "error": "没有服务商接受这个 key：" + "；".join(f"{k} {v}" for k, v in tried.items())}
 

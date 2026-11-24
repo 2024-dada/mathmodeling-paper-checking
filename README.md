@@ -12,31 +12,34 @@
           └► 防御性语言率（5 类）──┴──► HTML 报告 + 专项优化提示词 ──► 交给 AI 改稿
 ```
 
-## 安装
+## 在线使用
 
-```bash
-git clone <本仓库地址> && cd papersim
-pip install -e .
-# 可选：装 poppler（pdftotext），PDF 抽取更准。没有时自动回退到 pypdf
-```
+**打开 <https://2024-dada.github.io/mathmodeling-paper-checking/> 即可，不用安装。**
 
-## 网页版（推荐）
-
-```bash
-papersim-web            # 自动打开浏览器，默认 http://127.0.0.1:8765
-```
-
+- **论文不上传。** PDF 在你的浏览器里解析，所有计算也在浏览器里完成，网站没有服务器端。
 - **放文件**：把论文拖进对应区域，或者点击选择。被测论文、比对库、赛题原文各一栏，可以整个文件夹拖进去。拖到页面任意位置会默认加入"被测论文"。
-- **填 API**：粘贴 key 后自动识别服务商，并弹出模型列表，可以搜索，推荐模型会标出来。识别规则：
-  - 先按 key 前缀判断。`sk-ant-` 是 Anthropic，`sk-or-` 是 OpenRouter，`AIza` 是 Gemini，`xxx.yyy` 格式是智谱，UUID 格式是火山方舟。
+- **填 API（可选）**：粘贴 key 后自动识别服务商，并弹出模型列表，可以搜索，推荐模型会标出来。
+  - 先按 key 前缀判断：`sk-ant-` 是 Anthropic，`sk-or-` 是 OpenRouter，`AIza` 是 Gemini，`xxx.yyy` 格式是智谱，UUID 格式是火山方舟。
   - 普通的 `sk-` 开头会同时去问 DeepSeek、OpenAI、Kimi、硅基流动、通义千问，哪家接受就是哪家。
-  - 自建网关或中转地址在"服务商与地址"里填 Base URL。
-  - 列表拿不到时可以手动输入模型名。
-- **看结果**：每篇论文一张卡片，显示重复率、防御率（带目标线）和类别分布；下方分页签显示优化提示词（复制或下载）、AI 修改建议、防御句、相似句。也可以打开完整报告，或下载 CSV / JSON。
-- 服务只监听本机，key 只在内存里转发给服务商。勾选"记住 key"时，key 只保存在本机浏览器里。
+  - 中转或自建网关在"服务商与地址"里填 Base URL；列表拿不到时可以直接输入模型名。
+  - key 和句子由浏览器直接发给你选的服务商。勾选"记住 key"时，key 只保存在你自己的浏览器里。
+- **看结果**：每篇论文一张卡片，显示重复率、防御率（带目标线）和类别分布；下面分页签显示优化提示词（复制或下载）、AI 修改建议、防御句、相似句、重复高亮。可以下载 HTML 报告、全部提示词、CSV、JSON。
+
+有的服务商不允许网页直接调用，页面会提示"浏览器无法访问"。这时可以换一家服务商、换一个支持跨域的中转地址，或者用下面的本地版。
 
 ![首页](docs/web_home.png)
 ![结果](docs/web_results.png)
+
+## 本地版
+
+```bash
+git clone https://github.com/2024-dada/mathmodeling-paper-checking.git
+cd mathmodeling-paper-checking
+pip install -e .
+papersim-web            # 自动打开浏览器，默认 http://127.0.0.1:8765
+```
+
+界面和在线版完全一样。区别是大模型请求经本机转发，不受浏览器跨域限制，任何服务商都能用。
 
 ## 命令行用法
 
@@ -126,10 +129,19 @@ papersim examples/suspect.txt examples/original.txt -x examples/problem.txt -o e
 - 同题论文天然会共享数据描述类句子，比如"数据覆盖 34 季"，请结合高亮判断，不要只看数字。
 - 本工具用于**自查和改进写作**。竞赛有学术诚信要求，AI 使用必须如实披露。
 
+## 项目结构
+
+| 位置 | 内容 |
+|---|---|
+| `site/` | 网页前端（GitHub Pages 和本地版共用）。`engine.js` 是检测引擎的 JS 版，算法与 Python 版一致，有测试保证 |
+| `papersim/` | Python 包：命令行、检测引擎、本地网页服务 |
+| `papersim/lexicon.json` | 防御性语言词典，部署时同步到 `site/` |
+| `.github/workflows/pages.yml` | 推送到 main 后自动发布网页 |
+
 ## 开发
 
 ```bash
-pip install -e ".[dev]" && pytest -q
+pip install -e ".[dev]" && pytest -q      # 有 node 时会同时校验 JS 引擎与 Python 结果一致
 ```
 
 MIT License

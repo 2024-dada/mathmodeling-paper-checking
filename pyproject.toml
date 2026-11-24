@@ -23,4 +23,3 @@ packages = ["papersim", "papersim.web"]
 
 [tool.setuptools.package-data]
 papersim = ["lexicon.json"]
-"papersim.web" = ["index.html"]

@@ -180,3 +180,11 @@ def test_run_with_llm(app, mock_api):
 def test_run_rejects_empty(app):
     j = _wait(app, post(app + "/api/run", {"papers": [], "options": {}})["job"])
     assert j["status"] == "error" and "至少" in j["error"]
+
+
+def test_proxy_forwards_to_api(app, mock_api):
+    r = post(app + "/api/proxy", {"url": mock_api + "/models", "method": "GET",
+                                  "headers": {"Authorization": f"Bearer {GOOD_KEY}"}})
+    assert r["status"] == 200 and "deepseek-chat" in r["body"]
+    r = post(app + "/api/proxy", {"url": mock_api + "/models", "headers": {"Authorization": "Bearer nope"}})
+    assert r["status"] == 401
