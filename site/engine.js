@@ -314,6 +314,22 @@ export async function llmReview(doc, res, client, batch = 40) {
   return res;
 }
 
+/* ============================== 挡位 ============================== */
+// 1 最硬气 … 10 最保守。每档给出摘要/正文防御率目标和改写口径。
+export const LEVELS = [
+  { name: "绝对自信", summary: 0.02, body: 0.01, tone: "除 Limitations 一节外，删除全部免责、限定和模糊语；每个结论直接用数字正面陈述。" },
+  { name: "强势", summary: 0.04, body: 0.03, tone: "只保留会改变结论适用范围的限定，其余全部改成正面陈述加证据。" },
+  { name: "果断", summary: 0.06, body: 0.04, tone: "摘要不出现免责句；正文每节最多保留一句必要的边界说明。" },
+  { name: "自信", summary: 0.08, body: 0.06, tone: "摘要最多一句适用范围说明；正文的限定尽量换成灵敏度或检验结果。" },
+  { name: "均衡", summary: 0.10, body: 0.08, tone: "摘要保留一句关键边界；正文的限定集中到假设和局限两节，并配应对措施。" },
+  { name: "稳健", summary: 0.13, body: 0.10, tone: "保留主要假设前提的说明，删掉重复、空泛的免责；不确定性尽量量化。" },
+  { name: "审慎", summary: 0.16, body: 0.13, tone: "保留各结论的适用条件，但每条都要具体（哪个假设、多大范围），不要笼统否定。" },
+  { name: "严谨", summary: 0.20, body: 0.16, tone: "保留学术上必要的限定和可识别性讨论，只删去没有信息量的套话。" },
+  { name: "学术保守", summary: 0.25, body: 0.20, tone: "基本保留原有限定，只合并重复声明，并把模糊语替换成具体数字。" },
+  { name: "原样保留", summary: 0.30, body: 0.25, tone: "不主动删减限定，只改写明显空泛或自相矛盾的免责句。" },
+];
+export const DEFAULT_LEVEL = 5;
+
 /* ============================== 提示词 ============================== */
 const AI_TEMPLATE = [
   /\bit is worth (noting|mentioning)\b/i, /\bplays? an? (crucial|pivotal|vital|key|important) role\b/i,
@@ -334,7 +350,9 @@ const STRATEGY = {
 const P = x => (x * 100).toFixed(1) + "%", P0 = x => x == null ? "—" : Math.round(x * 100) + "%";
 const q = (s, n = 260) => (s = s.trim()).length <= n ? s : s.slice(0, n) + "…";
 
-export function buildPrompt(doc, dup, dfn, lex, { targetSummary = 0.10, targetBody = 0.08, maxItems = 30, embedText = false } = {}) {
+export function buildPrompt(doc, dup, dfn, lex, { level = null, targetSummary = 0.10, targetBody = 0.08, maxItems = 30, embedText = false } = {}) {
+  const lv = level ? LEVELS[level - 1] : null;
+  if (lv) { targetSummary = lv.summary; targetBody = lv.body; }
   const cats = lex.categories;
   const lang = /[一-鿿]{20,}/.test(doc.text) ? "中文" : "英文";
   const L = [`# 论文专项优化提示词：${doc.name}`, "",
@@ -348,7 +366,8 @@ export function buildPrompt(doc, dup, dfn, lex, { targetSummary = 0.10, targetBo
     "4. 不做同义词替换式的“降重”；每处修改都必须让论证更扎实或更有本队特色。", ""];
   if (dfn && dfn.hits.length) {
     L.push("## 底气：防御性语言优化",
-      `诊断：全文防御性语言率 **${P(dfn.rate)}**（摘要 ${P0(dfn.summary)}，正文 ${P0(dfn.body)}），防御强度 ${dfn.intensity.toFixed(1)} 分/千词。目标：摘要 ≤ ${P0(targetSummary)}，正文 ≤ ${P0(targetBody)}。`, "",
+      `诊断：全文防御性语言率 **${P(dfn.rate)}**（摘要 ${P0(dfn.summary)}，正文 ${P0(dfn.body)}），防御强度 ${dfn.intensity.toFixed(1)} 分/千词。目标：摘要 ≤ ${P0(targetSummary)}，正文 ≤ ${P0(targetBody)}。`,
+      ...(lv ? [`改写口径（第 ${level} 挡 · ${lv.name}）：${lv.tone}`] : []), "",
       "评委读到满篇“这不是预测”“仅为示意”“无法识别”时，会觉得作者对自己的结果没底气。改写原则：",
       "- 每个核心结论写成三步：**结论（带数字）→ 支撑证据（验证/对比/检验结果）→ 稳健性（扰动后是否仍成立）**。",
       "- 不确定性用数字表达（区间、误差、灵敏度），不用语气词表达。",
@@ -503,9 +522,49 @@ export async function detect(key, base = null) {
     defaultChat: pick(chat, info.prefer), defaultEmbed: embed.length ? pick(embed, info.embed) : null, tried };
 }
 
+// 余额查询：只有提供了公开接口的服务商才能查。返回 {ok, amount, currency, detail} 或 {ok:false, reason}
+const BALANCE = {
+  deepseek: { url: b => new URL(b).origin + "/user/balance",
+    parse: j => { const i = (j.balance_infos || [])[0]; return i && { amount: +i.total_balance, currency: i.currency, detail: `充值 ${i.topped_up_balance} · 赠送 ${i.granted_balance}` }; } },
+  moonshot: { url: b => new URL(b).origin + "/v1/users/me/balance",
+    parse: j => j.data && { amount: +j.data.available_balance, currency: "CNY", detail: `现金 ${(+j.data.cash_balance).toFixed(2)} · 代金券 ${(+j.data.voucher_balance).toFixed(2)}` } },
+  siliconflow: { url: b => new URL(b).origin + "/v1/user/info",
+    parse: j => j.data && { amount: +(j.data.totalBalance ?? j.data.balance), currency: "CNY", detail: `充值 ${j.data.chargeBalance ?? "—"} · 赠送 ${j.data.balance ?? "—"}` } },
+  openrouter: { url: () => "https://openrouter.ai/api/v1/key",
+    parse: j => j.data && (j.data.limit_remaining != null
+      ? { amount: +j.data.limit_remaining, currency: "USD", detail: `本 key 额度 ${j.data.limit} · 已用 ${(+j.data.usage).toFixed(4)}` }
+      : { amount: null, used: +j.data.usage, currency: "USD", detail: `本 key 累计已用 $${(+j.data.usage).toFixed(4)}（未设额度上限）` }) },
+};
+export function balanceSupported(provider) { return !!BALANCE[provider]; }
+export async function getBalance(provider, base, key) {
+  const b = BALANCE[provider];
+  if (!b) return { ok: false, reason: "该服务商没有公开的余额查询接口" };
+  try {
+    const r = await net.fetch(b.url(base || PROVIDERS[provider].base), { headers: authHeaders(base || "", key), signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return { ok: false, reason: `余额查询失败（HTTP ${r.status}）` };
+    const v = b.parse(await r.json());
+    return v ? { ok: true, ...v, at: Date.now() } : { ok: false, reason: "余额接口返回格式无法识别" };
+  } catch (e) { return { ok: false, reason: errText(e) }; }
+}
+
 export class Client {
-  constructor({ key, base, model, embedModel = null }) {
+  constructor({ key, base, model, embedModel = null, onUsage = null }) {
     this.key = key; this.base = (base || "https://api.openai.com/v1").replace(/\/$/, ""); this.model = model; this.embedModel = embedModel;
+    this.usage = { calls: 0, input: 0, output: 0, cached: 0, embed: 0 };
+    this.onUsage = onUsage;
+  }
+  track(out, kind) {
+    const u = out && out.usage;
+    this.usage.calls++;
+    if (u) {
+      if (kind === "embed") this.usage.embed += u.total_tokens || u.prompt_tokens || 0;
+      else {
+        this.usage.input += u.prompt_tokens || u.input_tokens || 0;
+        this.usage.output += u.completion_tokens || u.output_tokens || 0;
+        this.usage.cached += u.prompt_cache_hit_tokens || u.prompt_tokens_details?.cached_tokens || 0;
+      }
+    }
+    this.onUsage && this.onUsage({ ...this.usage });
   }
   async post(path, body, retries = 3) {
     for (let k = 0; ; k++) {
@@ -520,6 +579,7 @@ export class Client {
   }
   async chatText(prompt, temperature = 0.3) {
     const out = await this.post("/chat/completions", { model: this.model, temperature, messages: [{ role: "user", content: prompt }] });
+    this.track(out, "chat");
     return out.choices[0].message.content;
   }
   async chatJSON(prompt) {
@@ -527,6 +587,7 @@ export class Client {
     let out;
     try { out = await this.post("/chat/completions", body); }
     catch (e) { if (String(e.body || e.message).includes("response_format")) { delete body.response_format; out = await this.post("/chat/completions", body); } else throw e; }
+    this.track(out, "chat");
     const txt = out.choices[0].message.content.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
     return JSON.parse(txt);
   }
@@ -534,6 +595,7 @@ export class Client {
     const vecs = [];
     for (let i = 0; i < texts.length; i += batch) {
       const out = await this.post("/embeddings", { model: this.embedModel, input: texts.slice(i, i + batch) });
+      this.track(out, "embed");
       vecs.push(...out.data.sort((a, b) => a.index - b.index).map(d => d.embedding));
     }
     return vecs;
@@ -559,7 +621,7 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
   log("生成优化提示词…");
   const prompts = [], suggestions = [];
   for (let i = 0; i < k; i++) {
-    prompts.push(buildPrompt(docs[i], dup[i], dfn[i], lex, { targetSummary: opt.targetSummary ?? 0.1, targetBody: opt.targetBody ?? 0.08, embedText: !!opt.embedText }));
+    prompts.push(buildPrompt(docs[i], dup[i], dfn[i], lex, { level: opt.level ?? null, targetSummary: opt.targetSummary ?? 0.1, targetBody: opt.targetBody ?? 0.08, embedText: !!opt.embedText }));
     if (client && opt.apply) {
       log(`大模型执行优化提示词：${docs[i].name}`);
       suggestions.push(await client.chatText(opt.embedText ? prompts[i] : prompts[i] + "\n\n## 附：论文全文\n\n" + docs[i].text));

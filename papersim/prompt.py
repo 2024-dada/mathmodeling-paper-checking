@@ -35,6 +35,22 @@ STRATEGY = {
 }
 
 
+# 1 最硬气 … 10 最保守（与 site/engine.js 的 LEVELS 一致）
+LEVELS = [
+    ("绝对自信", 0.02, 0.01, "除 Limitations 一节外，删除全部免责、限定和模糊语；每个结论直接用数字正面陈述。"),
+    ("强势", 0.04, 0.03, "只保留会改变结论适用范围的限定，其余全部改成正面陈述加证据。"),
+    ("果断", 0.06, 0.04, "摘要不出现免责句；正文每节最多保留一句必要的边界说明。"),
+    ("自信", 0.08, 0.06, "摘要最多一句适用范围说明；正文的限定尽量换成灵敏度或检验结果。"),
+    ("均衡", 0.10, 0.08, "摘要保留一句关键边界；正文的限定集中到假设和局限两节，并配应对措施。"),
+    ("稳健", 0.13, 0.10, "保留主要假设前提的说明，删掉重复、空泛的免责；不确定性尽量量化。"),
+    ("审慎", 0.16, 0.13, "保留各结论的适用条件，但每条都要具体（哪个假设、多大范围），不要笼统否定。"),
+    ("严谨", 0.20, 0.16, "保留学术上必要的限定和可识别性讨论，只删去没有信息量的套话。"),
+    ("学术保守", 0.25, 0.20, "基本保留原有限定，只合并重复声明，并把模糊语替换成具体数字。"),
+    ("原样保留", 0.30, 0.25, "不主动删减限定，只改写明显空泛或自相矛盾的免责句。"),
+]
+DEFAULT_LEVEL = 5
+
+
 def ai_template_hits(doc: Document, limit=15):
     hits = []
     for s in doc.sentences:
@@ -50,7 +66,10 @@ def _q(s, n=260):
 
 
 def build(doc: Document, dup: DupResult = None, dfn: DefResult = None, lex=None,
-          target_summary=0.10, target_body=0.08, max_items=30, embed_text=False) -> str:
+          target_summary=0.10, target_body=0.08, max_items=30, embed_text=False, level=None) -> str:
+    lv = LEVELS[level - 1] if level else None
+    if lv:
+        target_summary, target_body = lv[1], lv[2]
     cats = (lex or {}).get("categories", {})
     lang = "中文" if re.search(r"[一-鿿]{20,}", doc.text) else "英文"
     L = [f"# 论文专项优化提示词：{doc.name}",
@@ -72,6 +91,7 @@ def build(doc: Document, dup: DupResult = None, dfn: DefResult = None, lex=None,
         L += ["## 底气：防御性语言优化",
               f"诊断：全文防御性语言率 **{dfn.rate:.1%}**（摘要 {dfn.summary_rate:.0%}，正文 {dfn.body_rate:.0%}），"
               f"防御强度 {dfn.intensity:.1f} 分/千词。目标：摘要 ≤ {target_summary:.0%}，正文 ≤ {target_body:.0%}。",
+              *([f"改写口径（第 {level} 挡 · {lv[0]}）：{lv[3]}"] if lv else []),
               "",
               "评委读到满篇“这不是预测”“仅为示意”“无法识别”时，会觉得作者对自己的结果没底气。改写原则：",
               "- 每个核心结论写成三步：**结论（带数字）→ 支撑证据（验证/对比/检验结果）→ 稳健性（扰动后是否仍成立）**。",

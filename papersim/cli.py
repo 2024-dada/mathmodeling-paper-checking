@@ -42,6 +42,8 @@ def main(argv=None):
     ap.add_argument("--embed-text", action="store_true", help="提示词里附上论文全文，可直接整段粘贴给 AI")
     ap.add_argument("--target-summary", type=float, default=0.10, help="摘要防御率目标，默认 0.10")
     ap.add_argument("--target-body", type=float, default=0.08, help="正文防御率目标，默认 0.08")
+    ap.add_argument("--level", type=int, choices=range(1, 11), metavar="1-10",
+                    help="防御率挡位：1 最硬气 … 10 最保守，默认 5（均衡）；设置后覆盖 --target-summary/--target-body")
     ap.add_argument("--apply", action="store_true", help="直接调用 API 执行提示词，输出 AI 的修改建议（需 API 配置）")
     ap.add_argument("-V", "--version", action="version", version=__version__)
     a = ap.parse_args(argv)
@@ -64,7 +66,8 @@ def main(argv=None):
 
     opt = Options(only=a.only, n=a.n, para_threshold=a.para_threshold, lexicon=a.lexicon, threshold=a.threshold,
                   llm_review=a.llm, llm_embed=a.llm, apply=a.apply, prompt=not a.no_prompt,
-                  embed_text=a.embed_text, target_summary=a.target_summary, target_body=a.target_body)
+                  embed_text=a.embed_text, target_summary=a.target_summary, target_body=a.target_body,
+                  level=a.level)
     try:
         res = run(docs, corpus, exclude, opt, client, log=lambda m: print(f"[papersim] {m}", file=sys.stderr))
     except ValueError as e:

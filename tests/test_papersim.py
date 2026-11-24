@@ -101,3 +101,19 @@ def test_cli_end_to_end(tmp_path, capsys):
     assert out.exists() and "防御性语言率" in out.read_text(encoding="utf-8")
     assert (tmp_path / "prompts" / "suspect_优化提示词.md").exists()
     assert "suspect" in (tmp_path / "s.csv").read_text(encoding="utf-8-sig")
+
+
+def test_levels_consistent_with_js():
+    import json, re
+    from papersim.prompt import LEVELS
+    js = (Path(__file__).resolve().parent.parent / "site/engine.js").read_text(encoding="utf-8")
+    names = re.findall(r'\{ name: "([^"]+)", summary: ([\d.]+), body: ([\d.]+)', js)
+    assert [(n, float(a), float(b)) for n, a, b in names] == [(n, a, b) for n, a, b, _ in LEVELS]
+
+
+def test_level_changes_prompt():
+    s = Document.load(EX / "suspect.txt")
+    f = analyze(s, LEX)
+    p1, p9 = build(s, None, f, LEX, level=1), build(s, None, f, LEX, level=9)
+    assert "摘要 ≤ 2%" in p1 and "绝对自信" in p1
+    assert "摘要 ≤ 25%" in p9 and "学术保守" in p9

@@ -20,6 +20,7 @@ class Options:
     embed_text: bool = False
     target_summary: float = 0.10
     target_body: float = 0.08
+    level: int = None               # 1–10 挡，设置后覆盖两个目标值
 
 
 @dataclass
@@ -62,7 +63,7 @@ def run(docs, corpus=(), exclude=(), opt: Options = None, client=None, log=print
     if opt.prompt:
         log("生成优化提示词…")
         for i, (d, u, f) in enumerate(zip(docs, dup, dfn)):
-            prompts[i] = build_prompt(d, u, f, lex, opt.target_summary, opt.target_body, embed_text=opt.embed_text)
+            prompts[i] = build_prompt(d, u, f, lex, opt.target_summary, opt.target_body, embed_text=opt.embed_text, level=opt.level)
             if client and opt.apply:
                 log(f"大模型执行优化提示词：{d.name}")
                 full = prompts[i] if opt.embed_text else prompts[i] + "\n\n## 附：论文全文\n\n" + d.text

@@ -6,7 +6,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d) + "%";
 const ALLOWED = /\.(pdf|txt|md|tex)$/i;
 const files = { papers: [], corpus: [], exclude: [] };
-const CAT_COLOR = { disclaimer: "#e8604c", contrast: "#d9822b", limitation: "#8e6bbf", scope: "#3a8fb7", hedge: "#5aa469" };
+const CAT_COLOR = { disclaimer: "#ff3c8e", contrast: "#ffb000", limitation: "#8f5cff", scope: "#2de2e6", hedge: "#5cf2a6" };
 let mode = "", LEX = null, last = null;
 
 const store = { get(k) { try { return localStorage.getItem(k) } catch (e) { return null } }, set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch (e) { } } };
@@ -93,6 +93,26 @@ window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth =
 window.addEventListener("dragover", e => e.preventDefault());
 window.addEventListener("drop", e => { dragDepth = 0; $("#overlay").classList.remove("on"); handleDrop(e, "papers"); });
 
+/* ---------------- 挡位 ---------------- */
+let level = +(store.get("ps_level") || E.DEFAULT_LEVEL);
+const LV_COLORS = ["#ff3c8e", "#ff4f9a", "#ff66a8", "#e06cc4", "#b670e6", "#8f7cff", "#6c9cff", "#4cbdf2", "#2de2e6", "#5cf2a6"];
+function drawGauge() {
+  $("#gauge").innerHTML = E.LEVELS.map((lv, i) => `<button role="radio" aria-checked="${i + 1 === level}" aria-label="第 ${i + 1} 挡 ${lv.name}" data-l="${i + 1}"
+    class="${i + 1 <= level ? "lit" : ""} ${i + 1 === level ? "cur" : ""}" style="height:${30 + i * 7.8}%;--c:${LV_COLORS[i]}"><span>${i + 1}</span></button>`).join("");
+  $("#gauge").querySelectorAll("button").forEach(b => b.onclick = () => { level = +b.dataset.l; store.set("ps_level", String(level)); drawGauge(); });
+  const lv = E.LEVELS[level - 1];
+  $("#lvName").textContent = `第 ${level} 挡 · ${lv.name}${level === E.DEFAULT_LEVEL ? "（推荐）" : ""}`;
+  $("#lvTarget").textContent = `摘要 ≤ ${Math.round(lv.summary * 100)}%　正文 ≤ ${Math.round(lv.body * 100)}%`;
+  $("#lvTone").textContent = lv.tone;
+}
+$("#gauge").addEventListener("keydown", e => {
+  if (e.key === "ArrowRight" || e.key === "ArrowUp") level = Math.min(10, level + 1);
+  else if (e.key === "ArrowLeft" || e.key === "ArrowDown") level = Math.max(1, level - 1);
+  else return;
+  e.preventDefault(); store.set("ps_level", String(level)); drawGauge(); $("#gauge").querySelector(".cur")?.focus();
+});
+drawGauge();
+
 /* ---------------- 设置 ---------------- */
 document.querySelectorAll("#mode button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b)); mode = b.dataset.v;
@@ -140,7 +160,7 @@ function Combo(el, { placeholder, onChange }) {
     get value() { return st.value; }
   };
 }
-const chat = Combo($("#cmChat"), { placeholder: "填好 key 后自动列出", onChange: v => { if (v) store.set("ps_model", v); syncOpts(); } });
+const chat = Combo($("#cmChat"), { placeholder: "填好 key 后自动列出", onChange: v => { if (v) store.set("ps_model", v); syncOpts(); if (typeof loadPrice === "function") loadPrice(); } });
 const embed = Combo($("#cmEmbed"), { placeholder: "不使用", onChange: v => { if (v) store.set("ps_embed", v); syncOpts(); } });
 function syncOpts() {
   const hasChat = !!chat.value, hasEmbed = !!embed.value;
@@ -151,6 +171,55 @@ function syncOpts() {
 }
 $("#oEmbed").onchange = e => e.target._touched = true;
 
+/* ---------------- 余额与消耗 ---------------- */
+let provider = null, balance = null, balBusy = false, lastBalAt = 0;
+const SYM = { CNY: "¥", USD: "$" };
+const money = (x, cur) => x == null || isNaN(x) ? "—" : `${SYM[cur] || ""}${Math.abs(x) < 1 ? x.toFixed(4) : x.toFixed(2)}`;
+async function refreshBalance(quiet = false) {
+  const key = $("#key").value.trim();
+  if (!key || !provider) { $("#balV").textContent = "—"; $("#balS").textContent = "填好 key 后自动查询"; return null; }
+  if (!E.balanceSupported(provider)) { $("#balV").textContent = "—"; $("#balS").textContent = "该服务商没有公开的余额查询接口，请在官网控制台查看"; return null; }
+  if (balBusy) return balance;
+  balBusy = true; if (!quiet) $("#balS").textContent = "查询中…";
+  const r = await E.getBalance(provider, $("#base").value.trim(), key);
+  balBusy = false; lastBalAt = Date.now();
+  if (r.ok) {
+    balance = r;
+    $("#balV").textContent = r.amount != null ? money(r.amount, r.currency) : `已用 ${money(r.used, r.currency)}`;
+    $("#balS").textContent = `${r.detail} · ${new Date(r.at).toLocaleTimeString()}`;
+    return r;
+  }
+  $("#balV").textContent = "—"; $("#balS").textContent = r.reason + (!E.net.proxied && /浏览器/.test(r.reason) ? "（本地版可查）" : "");
+  return null;
+}
+$("#balRf").onclick = () => refreshBalance();
+
+function priceKey() { return "ps_price_" + (chat.value || "_"); }
+function loadPrice() {
+  let p = null; try { p = JSON.parse(store.get(priceKey()) || "null"); } catch (e) { }
+  $("#pIn").value = p?.in ?? ""; $("#pOut").value = p?.out ?? "";
+  $("#pCur").value = p?.cur || (["openai", "openrouter", "anthropic", "gemini"].includes(provider) ? "USD" : "CNY");
+}
+function savePrice() { store.set(priceKey(), JSON.stringify({ in: $("#pIn").value, out: $("#pOut").value, cur: $("#pCur").value })); showUsage(usage); }
+["#pIn", "#pOut", "#pCur"].forEach(id => $(id).addEventListener("change", savePrice));
+
+let usage = { calls: 0, input: 0, output: 0, cached: 0, embed: 0 }, costByBalance = null;
+const fmtN = n => n.toLocaleString("en-US");
+function estimate(u) {
+  const pi = parseFloat($("#pIn").value), po = parseFloat($("#pOut").value);
+  if (isNaN(pi) && isNaN(po)) return null;
+  return ((u.input * (pi || 0)) + (u.output * (po || 0))) / 1e6;
+}
+function showUsage(u) {
+  usage = u;
+  $("#useS").textContent = `${u.calls} 次调用 · 输入 ${fmtN(u.input)} · 输出 ${fmtN(u.output)} tokens` + (u.cached ? ` · 缓存命中 ${fmtN(u.cached)}` : "") + (u.embed ? ` · 向量 ${fmtN(u.embed)}` : "");
+  const est = estimate(u), cur = $("#pCur").value;
+  if (costByBalance) { $("#costV").textContent = money(costByBalance.amount, costByBalance.currency); $("#costS").textContent = "按运行前后的余额差计算" + (est != null ? ` · 按单价估算 ${money(est, cur)}` : ""); }
+  else if (est != null) { $("#costV").textContent = "≈ " + money(est, cur); $("#costS").textContent = "按你填的单价估算"; }
+  else if (u.calls) { $("#costV").textContent = "—"; $("#costS").textContent = "在“服务商、地址与单价”里填写单价即可估算金额"; }
+  if (u.calls && Date.now() - lastBalAt > 8000 && balance) refreshBalance(true);   // 运行中顺带刷新余额
+}
+
 /* ---------------- API 识别 ---------------- */
 $("#prov").innerHTML = `<option value="">自动识别</option>` + Object.entries(E.PROVIDERS).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("") + `<option value="custom">自定义地址</option>`;
 let seq = 0, timer = null;
@@ -160,7 +229,7 @@ function showErr(t) { const e = $("#err"); e.textContent = t || ""; e.style.disp
 async function detectModels(autoOpen = true) {
   const key = $("#key").value.trim(), my = ++seq;
   showErr("");
-  if (!key) { status("", "未填写"); chat.disable(); embed.disable(); syncOpts(); return; }
+  if (!key) { status("", "未填写"); chat.disable(); embed.disable(); syncOpts(); provider = null; refreshBalance(); return; }
   if (key.length < 16) { status("", "key 太短"); return; }
   status("busy", "识别中…");
   const base = $("#base").value.trim();
@@ -168,6 +237,8 @@ async function detectModels(autoOpen = true) {
   if (my !== seq) return;
   if (r.base && !base) $("#base").value = r.base;
   if (r.provider) $("#prov").value = E.PROVIDERS[r.provider] ? r.provider : "custom";
+  provider = r.provider || null; balance = null;
+  refreshBalance();
   if (r.ok) {
     status("ok", `${r.providerName} · ${r.chat.length} 个对话模型`);
     const saved = store.get("ps_model");
@@ -198,12 +269,12 @@ $("#prov").onchange = e => {
   detectModels();
 };
 $("#base").addEventListener("change", () => detectModels());
-const client = () => chat.value ? new E.Client({ key: $("#key").value.trim(), base: $("#base").value.trim(), model: chat.value, embedModel: embed.value || null }) : null;
+const client = (track = true) => chat.value ? new E.Client({ key: $("#key").value.trim(), base: $("#base").value.trim(), model: chat.value, embedModel: embed.value || null, onUsage: track ? showUsage : null }) : null;
 $("#testBtn").onclick = async () => {
   const out = $("#testOut");
   if (!chat.value) { out.textContent = "请先选择模型"; return; }
   out.style.color = ""; out.textContent = "测试中…";
-  try { const r = await client().chatText("只回复两个字：可用", 0); out.textContent = `✓ 可用（模型回复：${r.trim().slice(0, 30)}）`; out.style.color = "var(--ok)"; }
+  try { const r = await client(false).chatText("只回复两个字：可用", 0); out.textContent = `✓ 可用（模型回复：${r.trim().slice(0, 30)}）`; out.style.color = "var(--ok)"; }
   catch (e) { out.textContent = `✗ ${e.message}`; out.style.color = "var(--dup)"; }
 };
 if (store.get("ps_remember")) { $("#remember").checked = true; const k = store.get("ps_key"); if (k) { $("#key").value = k; setTimeout(() => detectModels(false), 300); } }
@@ -227,15 +298,31 @@ $("#run").onclick = async () => {
     }
     for (const d of got.papers) if (d.sentences.length < 3) toast(`${d.name} 几乎没抽出文字，可能是扫描版 PDF`);
     const useLLM = chat.value && ($("#oReview").checked || $("#oApply").checked || (embed.value && $("#oEmbed").checked));
+    let before = null;
+    if (useLLM) {
+      costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
+      $("#costV").textContent = "…"; $("#costS").textContent = "运行中，实时统计";
+      before = await refreshBalance(true);
+    }
     const res = await E.run({
       docs: got.papers, corpus: got.corpus, exclude: got.exclude, lex, client: useLLM ? client() : null, log: say,
       opt: {
-        only: mode || null, paraThreshold: +$("#para").value, targetSummary: $("#tSum").value / 100, targetBody: $("#tBody").value / 100,
+        only: mode || null, paraThreshold: +$("#para").value, level,
         embedText: $("#embedText").checked, llmReview: $("#oReview").checked && !$("#oReview").disabled,
         llmEmbed: $("#oEmbed").checked && !$("#oEmbed").disabled, apply: $("#oApply").checked && !$("#oApply").disabled,
       }
     });
-    last = { ...res, lex, targets: [$("#tSum").value / 100, $("#tBody").value / 100] };
+    last = { ...res, lex, targets: [E.LEVELS[level - 1].summary, E.LEVELS[level - 1].body] };
+    if (useLLM && before) {
+      await say("更新余额…"); await new Promise(r => setTimeout(r, 1500));
+      const after = await refreshBalance(true);
+      if (after && after.currency === before.currency) {
+        const d = before.amount != null && after.amount != null ? before.amount - after.amount : (after.used ?? 0) - (before.used ?? 0);
+        if (d >= 0) costByBalance = { amount: d, currency: after.currency };
+      }
+      showUsage(usage);
+      if (costByBalance && costByBalance.amount === 0 && usage.calls) $("#costS").textContent = "余额暂未变化（部分服务商扣费有延迟，稍后点“刷新”）";
+    }
     showResults(last);
     log.textContent = "完成";
   } catch (e) { log.textContent = "出错：" + e.message; log.style.color = "var(--dup)"; console.error(e); }
@@ -246,12 +333,12 @@ $("#run").onclick = async () => {
 /* ---------------- 结果 ---------------- */
 function track(x, color, tgt, scale = 1) {
   const w = Math.min(100, (x || 0) / scale * 100);
-  return `<div class="track"><div class="fill" style="width:${w}%;background:${color}"></div>${tgt != null ? `<div class="tgt" style="left:${Math.min(100, tgt / scale * 100)}%" title="目标 ${pct(tgt, 0)}"></div>` : ""}</div>`;
+  return `<div class="track"><div class="fill" style="width:${w}%;background:${color};color:${color}"></div>${tgt != null ? `<div class="tgt" style="left:${Math.min(100, tgt / scale * 100)}%" title="目标 ${pct(tgt, 0)}"></div>` : ""}</div>`;
 }
 function highlightDup(text, spans) {
   const prio = { excluded: 1, paraphrase: 2, exact: 3 }, kind = new Array(text.length).fill(null), src = new Array(text.length).fill("");
   for (const [a, b, k, s] of spans) for (let i = a; i < Math.min(b, text.length); i++) if (!kind[i] || prio[k] > prio[kind[i]]) { kind[i] = k; src[i] = s; }
-  const col = { exact: "#f4b6ad", paraphrase: "#f7dc9c", excluded: "#d9d9d4" }, tip = { exact: "逐字重复", paraphrase: "改写相似", excluded: "赛题原文" };
+  const col = { exact: "rgba(255,60,142,.38)", paraphrase: "rgba(255,176,0,.32)", excluded: "rgba(143,92,255,.28)" }, tip = { exact: "逐字重复", paraphrase: "改写相似", excluded: "赛题原文" };
   let out = "", i = 0;
   while (i < text.length) {
     let j = i; while (j < text.length && kind[j] === kind[i] && src[j] === src[i]) j++;
@@ -263,17 +350,17 @@ function highlightDup(text, spans) {
 }
 function highlightDef(sent, matches) {
   let out = "", pos = 0;
-  for (const [a, b, c] of matches) { if (a < pos) continue; out += esc(sent.slice(pos, a)) + `<mark style="background:${CAT_COLOR[c]}2e;border-bottom:2px solid ${CAT_COLOR[c]}">${esc(sent.slice(a, b))}</mark>`; pos = b; }
+  for (const [a, b, c] of matches) { if (a < pos) continue; out += esc(sent.slice(pos, a)) + `<mark style="background:${CAT_COLOR[c]}33;color:inherit;border-bottom:2px solid ${CAT_COLOR[c]}">${esc(sent.slice(a, b))}</mark>`; pos = b; }
   return out + esc(sent.slice(pos));
 }
 function paperCard(r, k) {
   const { docs, dup, dfn, prompts, suggestions, lex, targets: [tS, tB] } = r;
   const doc = docs[k], d = dup[k], f = dfn[k], p = prompts[k], sg = suggestions[k], cats = lex.categories;
-  const dupBox = d ? `<div class="metric dup"><div class="lab">总重复率</div><div class="big">${pct(d.total)}</div>${track(d.total, "var(--dup)", null, .5)}
+  const dupBox = d ? `<div class="metric dup"><div class="lab">总重复率</div><div class="big">${pct(d.total)}</div>${track(d.total, "var(--magenta)", null, .5)}
     <div class="kv"><span>逐字 <b>${pct(d.exact)}</b></span><span>改写 <b>${pct(d.paraphrase)}</b></span><span>赛题引用 <b>${pct(d.excluded)}</b></span>
     ${Object.keys(d.bySource).length ? `<span>最相似：<b>${esc(Object.keys(d.bySource)[0])}</b> ${pct(Object.values(d.bySource)[0])}</span>` : ""}</div></div>` : "";
   const cls = (x, t) => x == null ? "" : (x <= t ? "good" : "bad");
-  const defBox = f ? `<div class="metric def"><div class="lab">防御性语言率</div><div class="big">${pct(f.rate)}</div>${track(f.rate, "var(--def)", tB, .5)}
+  const defBox = f ? `<div class="metric def"><div class="lab">防御性语言率</div><div class="big">${pct(f.rate)}</div>${track(f.rate, "var(--cyan)", tB, .5)}
     <div class="kv"><span>摘要 <b class="${cls(f.summary, tS)}">${pct(f.summary, 0)}</b> / 目标 ${pct(tS, 0)}</span><span>正文 <b class="${cls(f.body, tB)}">${pct(f.body, 0)}</b> / 目标 ${pct(tB, 0)}</span>
     <span>强度 <b>${f.intensity.toFixed(1)}</b> 分/千词</span>${f.llmRate != null ? `<span>大模型复核 <b>${pct(f.llmRate)}</b></span>` : ""}</div>
     <div class="cats">${Object.entries(f.byCategory).map(([c, v]) => `<span>${esc(cats[c].label)}</span><div class="bar" style="width:${Math.max(2, v * 200)}%;background:${CAT_COLOR[c]}"></div><span>${pct(v, 0)}</span>`).join("")}</div></div>` : "";
@@ -287,7 +374,7 @@ function paperCard(r, k) {
     ${f ? `<div class="pane" data-p="defs">${f.hits.length ? [...f.hits].sort((a, b) => b.score - a.score).map(h => `<div class="sent"><div class="t">${h.index < doc.summaryCutoff ? "摘要" : "正文"} · ${h.categories.map(c => cats[c].label).join("、")} · 得分 ${h.score}</div>${highlightDef(h.text, h.matches)}</div>`).join("") : `<div class="none">没有检出防御性句</div>`}
       ${f.llmHits.length ? `<div class="hint" style="margin-top:12px">大模型额外判定的防御句：</div>` + f.llmHits.map(h => `<div class="sent"><div class="t">${esc(h.category)}</div>${esc(h.text)}</div>`).join("") : ""}</div>` : ""}
     ${d ? `<div class="pane" data-p="pairs">${d.pairs.length ? d.pairs.map(([s, a, src, b]) => `<div class="pair"><span class="s">${pct(s, 0)}</span> · 来源 ${esc(src)}<br>本文：${esc(a)}<br>来源：${esc(b)}</div>`).join("") : `<div class="none">没有相似句</div>`}</div>
-      <div class="pane" data-p="full"><div class="legend"><span><i style="background:#f4b6ad"></i>逐字重复</span><span><i style="background:#f7dc9c"></i>改写相似</span><span><i style="background:#d9d9d4"></i>赛题原文</span></div><div class="fulltext">${highlightDup(doc.text, d.spans)}</div></div>` : ""}
+      <div class="pane" data-p="full"><div class="legend"><span><i style="background:rgba(255,60,142,.6)"></i>逐字重复</span><span><i style="background:rgba(255,176,0,.55)"></i>改写相似</span><span><i style="background:rgba(143,92,255,.5)"></i>赛题原文</span></div><div class="fulltext">${highlightDup(doc.text, d.spans)}</div></div>` : ""}
   </section>`;
 }
 function showResults(r) {
