@@ -612,30 +612,37 @@ export class Client {
 }
 
 /* ============================== 总流程 ============================== */
-export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, client = null, log = () => {} }) {
+export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, client = null, log = () => {}, progress = () => {} }) {
   const k = docs.length;
   if (opt.only !== "def" && docs.length + corpus.length < 2) throw new Error("重复率至少需要两篇（被测论文 + 比对库）。只测防御性语言请选“只看防御性语言”");
   if (opt.threshold != null) lex.threshold = opt.threshold;
   let dup = Array(k).fill(null), dfn = Array(k).fill(null);
+  const total = k * (1 + (opt.only !== "def" ? 1 : 0) + (opt.only !== "dup" ? 1 : 0) + (opt.only !== "dup" && client && opt.llmReview ? 1 : 0) + (client && opt.apply ? 1 : 0));
+  let done = 0;
+  const advance = () => progress(++done, total);
   if (opt.only !== "def") {
-    log("计算重复率…");
+    await log("计算重复率…");
     const embedFn = client && opt.llmEmbed && client.embedModel ? t => client.embed(t) : null;
-    dup = await checkAll(docs, corpus, exclude, { paraThreshold: opt.paraThreshold ?? 0.6, embedFn });
+    for (let i = 0; i < k; i++) {
+      await log(`计算重复率 ${i + 1}/${k}：${docs[i].name}`);
+      dup[i] = await checkDup(docs[i], docs.filter((_, j) => j !== i).concat(corpus), exclude, { paraThreshold: opt.paraThreshold ?? 0.6, embedFn }); advance();
+    }
   }
   if (opt.only !== "dup") {
-    log("计算防御性语言率…");
-    dfn = docs.map(d => analyzeDef(d, lex));
-    if (client && opt.llmReview) for (let i = 0; i < k; i++) { log(`大模型复核防御句：${docs[i].name}`); await llmReview(docs[i], dfn[i], client); }
+    for (let i = 0; i < k; i++) { await log(`计算防御性语言 ${i + 1}/${k}：${docs[i].name}`); dfn[i] = analyzeDef(docs[i], lex); advance(); }
+    if (client && opt.llmReview) for (let i = 0; i < k; i++) { await log(`大模型复核防御句 ${i + 1}/${k}：${docs[i].name}`); await llmReview(docs[i], dfn[i], client); advance(); }
   }
-  log("生成优化提示词…");
+  await log("生成优化提示词…");
   const prompts = [], suggestions = [];
   for (let i = 0; i < k; i++) {
     prompts.push(buildPrompt(docs[i], dup[i], dfn[i], lex, { level: opt.level ?? null, targetSummary: opt.targetSummary ?? 0.1, targetBody: opt.targetBody ?? 0.08, embedText: !!opt.embedText }));
+    advance();
     if (client && opt.apply) {
-      log(`大模型执行优化提示词：${docs[i].name}`);
+      await log(`大模型生成修改建议 ${i + 1}/${k}：${docs[i].name}`);
       suggestions.push(await client.chatText(opt.embedText ? prompts[i] : prompts[i] + "\n\n## 附：论文全文\n\n" + docs[i].text));
+      advance();
     } else suggestions.push(null);
   }
-  log("完成");
+  await log("检测计算完成，正在整理报告…");
   return { docs, dup, dfn, prompts, suggestions, style: docs.map(analyzeStyle) };
 }

@@ -37,3 +37,10 @@ footer{max-width:none;margin-top:40px;background:rgba(16,23,40,.88);padding:22px
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
 .pdf-download{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:30px;border:1px solid var(--line2);border-radius:12px;background:var(--panel)}.pdf-download h3{margin:0 0 8px}.pdf-download p{color:var(--ink2);margin:0;max-width:65ch}.pdf-download button{flex-shrink:0}@media(max-width:760px){.pdf-download{flex-direction:column;align-items:stretch;padding:22px}.pdf-download button{width:100%}}
+
+.run-progress{padding:22px 26px;border:1px solid var(--line2);border-radius:12px;background:var(--panel);margin:20px 0;color:var(--ink)}
+.run-progress[hidden]{display:none}.progress-heading{display:flex;justify-content:space-between;gap:16px;margin-bottom:14px}.progress-heading span{font-family:var(--mono);color:var(--cyan)}
+.progress-track{height:10px;background:#091322;border-radius:10px;overflow:hidden}.progress-track>div{height:100%;width:0;background:linear-gradient(90deg,#6b91c7,var(--cyan));transition:width .25s;border-radius:10px}
+#progressDetail{margin:12px 0 6px;overflow-wrap:anywhere}.run-progress small{color:var(--ink3)}.run-progress.failed{border-color:var(--magenta)}
+.detecting #analysisInputs,.detecting #results{opacity:.65}.detecting .run-progress{position:sticky;bottom:16px;z-index:20;box-shadow:0 10px 40px #0008}.detecting #progressFill{background-size:200% 100%;animation:progress-glow 2s linear infinite}
+@keyframes progress-glow{50%{filter:brightness(1.25)}}

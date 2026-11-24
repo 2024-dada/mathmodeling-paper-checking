@@ -14,6 +14,45 @@ let mode = "", LEX = null, last = null;
 const store = { get(k) { try { return localStorage.getItem(k) } catch (e) { return null } }, set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch (e) { } } };
 function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 1800); }
 const tick = () => new Promise(r => setTimeout(r, 0));
+let detecting = false, inputGeneration = 0, progressValue = 0;
+function blocked() {
+  if (!detecting) return false;
+  toast("正在检测中，请等待本次检测结束后再操作"); return true;
+}
+function setProgress(value, detail) {
+  progressValue = Math.max(progressValue, Math.min(100, Math.round(value)));
+  $("#progressFill").style.width = progressValue + "%";
+  $("#progressPercent").textContent = progressValue + "%";
+  $("#progressTrack").setAttribute("aria-valuenow", String(progressValue));
+  if (detail) { $("#progressDetail").textContent = detail; $("#progressTrack").setAttribute("aria-valuetext", `${progressValue}%：${detail}`); }
+}
+function lockDetection(lock) {
+  detecting = lock;
+  const area = $("#analysisInputs"); area.inert = lock; area.setAttribute("aria-disabled", String(lock));
+  $("#results").inert = lock;
+  document.body.classList.toggle("detecting", lock);
+  $("#run").dataset.busy = lock ? "1" : "";
+  $("#run").disabled = lock || !files.papers.length;
+  $("#run").textContent = lock ? "检测中，请等待…" : "开始检测";
+  $("#spin").style.display = lock ? "block" : "none";
+  $("#progressState").textContent = lock ? "检测中，请等待" : "检测完成";
+  $("#progressTrack").setAttribute("aria-busy", String(lock));
+  if (lock) {
+    inputGeneration++; progressValue = 0; $("#runProgress").hidden = false;
+    $("#runProgress").classList.remove("failed");
+    document.querySelectorAll(".combo .pop").forEach(el => el.classList.remove("open"));
+    $("#overlay").classList.remove("on");
+    setProgress(0, "正在准备检测…");
+    $("#runProgress").scrollIntoView({ behavior: "smooth", block: "center" });
+  } else syncOpts();
+}
+// inert 阻止键盘和点击进入设置区；捕获点击时给出明确提示。
+document.addEventListener("click", e => {
+  if (!detecting) return;
+  const r = $("#analysisInputs").getBoundingClientRect(), result = $("#results").getBoundingClientRect();
+  if ((e.clientY >= r.top && e.clientY <= r.bottom) || (e.clientY >= result.top && e.clientY <= result.bottom)) { e.preventDefault(); e.stopPropagation(); blocked(); }
+}, true);
+
 
 /* ---------------- 初始化 ---------------- */
 const lexReady = fetch("lexicon.json").then(r => r.json()).then(j => (LEX = j));
@@ -43,6 +82,7 @@ async function readDoc(f, isExclude) {
 
 /* ---------------- 文件 ---------------- */
 function addFiles(g, list) {
+  if (blocked()) return;
   let n = 0;
   for (const f of list) {
     if (!ALLOWED.test(f.name)) continue;
@@ -57,7 +97,7 @@ function render() {
     const g = z.dataset.g, box = z.querySelector(".chips");
     box.innerHTML = files[g].map((f, i) => `<div class="chip"><span class="ext">${esc(f.name.split(".").pop())}</span><span class="fn" title="${esc(f.name)}">${esc(f.name)}</span><span class="sz">${(f.size / 1024).toFixed(0)} KB</span><button class="x" data-i="${i}" title="移除">×</button></div>`).join("");
     z.querySelector(".empty").style.display = files[g].length ? "none" : "";
-    box.querySelectorAll(".x").forEach(b => b.onclick = e => { e.stopPropagation(); files[g].splice(+b.dataset.i, 1); render(); });
+    box.querySelectorAll(".x").forEach(b => b.onclick = e => { e.stopPropagation(); if (blocked()) return; files[g].splice(+b.dataset.i, 1); render(); });
   });
   const ok = files.papers.length > 0, busy = $("#run").dataset.busy === "1";
   $("#run").disabled = !ok || busy;
@@ -79,19 +119,22 @@ async function entriesToFiles(items) {
 }
 async function handleDrop(e, g) {
   e.preventDefault(); e.stopPropagation();
+  if (blocked()) return;
+  const generation = inputGeneration;
   const list = (e.dataTransfer.items && await entriesToFiles(e.dataTransfer.items)) || [...e.dataTransfer.files];
+  if (generation !== inputGeneration) return;
   addFiles(g, list);
 }
 let pickTarget = "papers";
 document.querySelectorAll(".zone").forEach(z => {
-  z.onclick = () => { pickTarget = z.dataset.g; $("#picker").click(); };
+  z.onclick = () => { if (blocked()) return; pickTarget = z.dataset.g; $("#picker").click(); };
   z.ondragover = e => { e.preventDefault(); e.stopPropagation(); z.classList.add("drag"); $("#overlay").classList.remove("on"); };
   z.ondragleave = () => z.classList.remove("drag");
   z.ondrop = e => { z.classList.remove("drag"); dragDepth = 0; $("#overlay").classList.remove("on"); handleDrop(e, z.dataset.g); };
 });
 $("#picker").onchange = e => { addFiles(pickTarget, [...e.target.files]); e.target.value = ""; };
 let dragDepth = 0;
-window.addEventListener("dragenter", e => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { dragDepth++; $("#overlay").classList.add("on"); } });
+window.addEventListener("dragenter", e => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { if (detecting) return; dragDepth++; $("#overlay").classList.add("on"); } });
 window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("#overlay").classList.remove("on"); } });
 window.addEventListener("dragover", e => e.preventDefault());
 window.addEventListener("drop", e => { dragDepth = 0; $("#overlay").classList.remove("on"); handleDrop(e, "papers"); });
@@ -109,6 +152,7 @@ function drawGauge() {
   $("#lvTone").textContent = lv.tone;
 }
 $("#gauge").addEventListener("keydown", e => {
+  if (detecting) return;
   if (e.key === "ArrowRight" || e.key === "ArrowUp") level = Math.min(10, level + 1);
   else if (e.key === "ArrowLeft" || e.key === "ArrowDown") level = Math.max(1, level - 1);
   else return;
@@ -142,7 +186,7 @@ function Combo(el, { placeholder, onChange }) {
     ul.querySelectorAll("li[data-v]").forEach(li => li.onmousedown = e => { e.preventDefault(); set(li.dataset.v); close(); });
   }
   function set(v) { st.value = v; cv.querySelector("span").outerHTML = v ? `<span>${esc(v)}</span>` : `<span class="ph">${placeholder}</span>`; onChange && onChange(v); }
-  function open() { if (!st.enabled) return; pop.classList.add("open"); q.value = ""; draw(); setTimeout(() => q.focus(), 0); ul.querySelector(".sel")?.scrollIntoView({ block: "center" }); }
+  function open() { if (detecting || !st.enabled) return; pop.classList.add("open"); q.value = ""; draw(); setTimeout(() => q.focus(), 0); ul.querySelector(".sel")?.scrollIntoView({ block: "center" }); }
   function close() { pop.classList.remove("open"); }
   cv.onclick = () => pop.classList.contains("open") ? close() : open();
   q.oninput = draw;
@@ -285,6 +329,7 @@ chat.disable(); embed.disable(); syncOpts();
 
 /* ---------------- 运行 ---------------- */
 $("#run").onclick = async () => {
+  if (blocked() || !files.papers.length) return;
   const btn = $("#run"), log = $("#log");
   last = null;
   $("#dlPdf").disabled = true;
@@ -299,10 +344,14 @@ $("#run").onclick = async () => {
   const configuredClient = client();
   costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
   $("#costV").textContent = "—"; $("#costS").textContent = "本次尚未产生 API 消耗";
-  btn.dataset.busy = "1"; btn.disabled = true; $("#spin").style.display = "block"; log.style.color = "";
-  const say = async m => { log.textContent = m; await tick(); };
+  log.style.color = "";
+  let completed = false, failure = null;
+  lockDetection(true);
+  const say = async m => { log.textContent = "检测中 · " + m; setProgress(progressValue, m); await tick(); };
   try {
+    await say("加载检测资源…");
     await lexReady;
+    setProgress(3, "检测资源已就绪");
     const lex = E.compileLexicon(LEX);
     const all = [...files.papers.map(f => ["papers", f]), ...files.corpus.map(f => ["corpus", f]), ...files.exclude.map(f => ["exclude", f])];
     const got = { papers: [], corpus: [], exclude: [] };
@@ -311,6 +360,7 @@ $("#run").onclick = async () => {
       await say(`读取文件 ${i + 1}/${all.length}：${f.name}`);
       try { got[g].push(await readDoc(f, g === "exclude")); }
       catch (e) { throw new Error(`读取 ${f.name} 失败：${e.message}`); }
+      setProgress(3 + 27 * (i + 1) / all.length, `已读取 ${i + 1}/${all.length} 个文件`);
     }
     for (const d of got.papers) if (d.sentences.length < 3) toast(`${d.name} 几乎没抽出文字，可能是扫描版 PDF`);
     const useLLM = configuredClient && (settings.review || settings.apply || settings.semantic);
@@ -321,13 +371,14 @@ $("#run").onclick = async () => {
       before = await refreshBalance(true);
     }
     const res = await E.run({
-      docs: got.papers, corpus: got.corpus, exclude: got.exclude, lex, client: useLLM ? configuredClient : null, log: say,
+      docs: got.papers, corpus: got.corpus, exclude: got.exclude, lex, client: useLLM ? configuredClient : null, log: say, progress: (done, total) => setProgress(30 + 60 * done / total),
       opt: {
         only: settings.mode === "全部" ? null : settings.mode, paraThreshold: settings.threshold, level: settings.level,
         embedText: settings.embedText, llmReview: settings.review,
         llmEmbed: settings.semantic, apply: settings.apply,
       }
     });
+    setProgress(92, "正在整理检测结果…");
     last = { ...res, settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
     if (useLLM && before) {
       await say("更新余额…"); await new Promise(r => setTimeout(r, 1500));
@@ -341,10 +392,22 @@ $("#run").onclick = async () => {
     }
     last.accountText = $("#meter").innerText;
     showResults(last);
-    log.textContent = "完成";
-  } catch (e) { $("#runSummary").textContent = "本次检测未完成：" + e.message; log.textContent = "出错：" + e.message; log.style.color = "var(--dup)"; console.error(e); }
-  btn.dataset.busy = ""; $("#spin").style.display = "none"; render();
-  if (last) $("#log").textContent = "完成";
+    setProgress(100, "全部检测与报告整理已完成"); completed = true;
+  } catch (e) {
+    failure = e.message; last = null;
+    $("#runSummary").textContent = "本次检测未完成：" + e.message;
+    console.error(e);
+  } finally {
+    lockDetection(false); render();
+    if (completed) { log.textContent = "检测完成"; $("#progressState").textContent = "检测完成"; }
+    else {
+      $("#progressState").textContent = "检测未完成，可重新检测";
+      $("#runProgress").classList.add("failed");
+      setProgress(progressValue, failure || "检测未完成");
+      log.textContent = "出错：" + (failure || "检测未完成"); log.style.color = "var(--dup)";
+      $("#dlPdf").disabled = true;
+    }
+  }
 };
 
 /* ---------------- 结果 ---------------- */
