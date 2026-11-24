@@ -16,9 +16,11 @@ dev = ["pytest"]
 
 [project.scripts]
 papersim = "papersim.cli:main"
+papersim-web = "papersim.web.server:main"
 
 [tool.setuptools]
-packages = ["papersim"]
+packages = ["papersim", "papersim.web"]
 
 [tool.setuptools.package-data]
 papersim = ["lexicon.json"]
+"papersim.web" = ["index.html"]

@@ -16,6 +16,8 @@ import urllib.request
 
 import numpy as np
 
+from .providers import auth_headers
+
 
 class LLMClient:
     def __init__(self, api_key=None, base_url=None, model=None, embed_model=None, timeout=180):
@@ -30,7 +32,7 @@ class LLMClient:
     def _post(self, path, body, retries=3):
         req = urllib.request.Request(
             self.base + path, data=json.dumps(body).encode(),
-            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"})
+            headers=auth_headers(self.base, self.api_key))
         for k in range(retries):
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as r:

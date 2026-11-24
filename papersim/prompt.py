@@ -68,8 +68,8 @@ def build(doc: Document, dup: DupResult = None, dfn: DefResult = None, lex=None,
          ""]
 
     # ---------- 底气
-    if dfn:
-        L += ["## 一、底气：防御性语言优化",
+    if dfn and dfn.hits:
+        L += ["## 底气：防御性语言优化",
               f"诊断：全文防御性语言率 **{dfn.rate:.1%}**（摘要 {dfn.summary_rate:.0%}，正文 {dfn.body_rate:.0%}），"
               f"防御强度 {dfn.intensity:.1f} 分/千词。目标：摘要 ≤ {target_summary:.0%}，正文 ≤ {target_body:.0%}。",
               "",
@@ -94,7 +94,7 @@ def build(doc: Document, dup: DupResult = None, dfn: DefResult = None, lex=None,
     # ---------- 区分度
     tmpl = ai_template_hits(doc)
     if (dup and (dup.pairs or dup.exact_rate > 0)) or tmpl:
-        L += ["## 二、区分度：去同质化",
+        L += ["## 区分度：去同质化",
               "大家用同一个 AI 写同一道题，表述和段落结构会高度趋同。评委一天看几十篇，雷同的段落会直接被略过。"]
         if dup:
             top = list(dup.by_source.items())[:3]
@@ -127,8 +127,8 @@ def build(doc: Document, dup: DupResult = None, dfn: DefResult = None, lex=None,
             L.append("")
 
     # ---------- 输出格式
-    L += ["## 三、输出格式",
-          "1. 先给出 3 个差异化切入角度（如果有第二部分）。",
+    L += ["## 输出格式",
+          "1. 先给出 3 个差异化切入角度（如果有“区分度”部分）。",
           "2. 再用表格逐条给出：`原句 | 修改后 | 修改理由（对应上面哪条原则）`。",
           "3. 最后给出改写后的**摘要全文**（这是评委最先读、也最影响印象的部分）。",
           "4. 列出所有 `[需补充分析：…]` 的位置，作为作者的待办清单。",

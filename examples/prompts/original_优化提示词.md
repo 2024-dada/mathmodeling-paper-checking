@@ -10,23 +10,7 @@
 3. 保留论文的 Report on Use of AI Tools（竞赛要求如实披露 AI 使用）。
 4. 不做同义词替换式的“降重”；每处修改都必须让论证更扎实或更有本队特色。
 
-## 一、底气：防御性语言优化
-诊断：全文防御性语言率 **0.0%**（摘要 0%，正文 0%），防御强度 0.0 分/千词。目标：摘要 ≤ 10%，正文 ≤ 8%。
-
-评委读到满篇“这不是预测”“仅为示意”“无法识别”时，会觉得作者对自己的结果没底气。改写原则：
-- 每个核心结论写成三步：**结论（带数字）→ 支撑证据（验证/对比/检验结果）→ 稳健性（扰动后是否仍成立）**。
-- 不确定性用数字表达（区间、误差、灵敏度），不用语气词表达。
-- 必要的局限集中写一次，并且每条都说明如何控制或缓解它。
-- 摘要只保留一句最关键的适用范围声明，其余位置给出具体发现。
-
-分类改写策略：
-
-需要处理的句子（按防御强度排序，最多 30 条）：
-
-| # | 位置 | 类别 | 原句 |
-|---|---|---|---|
-
-## 二、区分度：去同质化
+## 区分度：去同质化
 大家用同一个 AI 写同一道题，表述和段落结构会高度趋同。评委一天看几十篇，雷同的段落会直接被略过。
 诊断：总重复率 **33.9%**（逐字 20.2%，改写相似 13.7%）。最相似的来源：suspect（33.9%）
 
@@ -52,8 +36,8 @@
 | 1 | The elevator chain is the cheapest option when no deadline is imposed. | suspect | When no deadline is imposed the elevator chain is the cheapest choice. | 75% |
 | 2 | The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site. | suspect | In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site. | 74% |
 
-## 三、输出格式
-1. 先给出 3 个差异化切入角度（如果有第二部分）。
+## 输出格式
+1. 先给出 3 个差异化切入角度（如果有“区分度”部分）。
 2. 再用表格逐条给出：`原句 | 修改后 | 修改理由（对应上面哪条原则）`。
 3. 最后给出改写后的**摘要全文**（这是评委最先读、也最影响印象的部分）。
 4. 列出所有 `[需补充分析：…]` 的位置，作为作者的待办清单。

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>papersim · 论文自查</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%227%22 fill=%22%231d1c1a%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2216%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22%3Eps%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f4ef; --paper:#fffdf9; --ink:#1d1c1a; --ink2:#55524c; --ink3:#8b877f; --line:#e4e0d6;
+  --dup:#c8452f; --dup-soft:#f6ddd6; --def:#2d6a96; --def-soft:#dbe8f2; --ok:#2f7d4f; --ok-soft:#dcefe2;
+  --warn:#b7791f; --radius:12px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.6 -apple-system,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:36px 24px 80px}
+header{display:flex;align-items:baseline;gap:14px;margin-bottom:26px}
+header h1{font-size:28px;letter-spacing:.5px;margin:0;font-weight:750}
+header .sub{color:var(--ink3)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:18px}
+.card h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.card h2 .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px}
+.card .desc{color:var(--ink3);font-size:13px;margin:0 0 16px}
+.optional{font-size:12px;font-weight:500;color:var(--ink3);border:1px solid var(--line);border-radius:10px;padding:0 8px}
+
+/* drop zones */
+.zones{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:14px}
+@media(max-width:820px){.zones{grid-template-columns:1fr}}
+.zone{border:1.5px dashed #cfc9bb;border-radius:10px;padding:16px;min-height:170px;display:flex;flex-direction:column;cursor:pointer;transition:.15s;background:#fcfbf7}
+.zone:hover{border-color:var(--ink3)}
+.zone.drag{border-color:var(--def);background:var(--def-soft)}
+.zone .zt{font-weight:650}
+.zone .zh{color:var(--ink3);font-size:12.5px;margin-bottom:10px}
+.zone .empty{margin:auto;color:var(--ink3);font-size:13px;text-align:center}
+.zone .empty b{display:block;font-size:22px;color:#bdb6a6;font-weight:400}
+.chips{display:flex;flex-direction:column;gap:6px}
+.chip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:13px}
+.chip .ext{font:600 10.5px var(--mono);color:#fff;background:var(--ink2);border-radius:4px;padding:1px 5px;text-transform:uppercase}
+.chip .fn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip .sz{color:var(--ink3);font-size:11.5px}
+.chip .x{border:0;background:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px}
+.chip .x:hover{color:var(--dup)}
+.zone .more{margin-top:auto;padding-top:8px;font-size:12px;color:var(--ink3)}
+
+/* settings */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px 28px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+label.f{display:block;font-size:13px;color:var(--ink2);margin-bottom:6px;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+.seg button{border:0;background:none;padding:7px 14px;cursor:pointer;font:inherit;color:var(--ink2)}
+.seg button.on{background:var(--ink);color:#fff}
+.range{display:flex;align-items:center;gap:12px}
+.range input{flex:1;accent-color:var(--ink)}
+.range output{font:600 13px var(--mono);min-width:46px;text-align:right}
+.hint{font-size:12px;color:var(--ink3);margin-top:4px}
+input[type=text],input[type=password],input[type=number],select{font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
+input:focus,select:focus{outline:2px solid #c9dcec;border-color:var(--def)}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;cursor:pointer;user-select:none}
+.check input{margin-top:4px;accent-color:var(--ink)}
+.check small{display:block;color:var(--ink3);font-size:12px}
+.check.disabled{opacity:.45;cursor:not-allowed}
+
+/* api */
+.keyrow{display:flex;gap:8px;align-items:center}
+.keyrow .kin{position:relative;flex:1}
+.keyrow .kin input{padding-right:40px;font-family:var(--mono);font-size:13.5px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;cursor:pointer;color:var(--ink3);font-size:15px}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:4px 10px;border-radius:20px;white-space:nowrap;background:#eeebe3;color:var(--ink2)}
+.status.ok{background:var(--ok-soft);color:var(--ok)}
+.status.err{background:var(--dup-soft);color:var(--dup)}
+.status .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.status.busy .dot{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.errbox{margin-top:8px;font-size:12.5px;color:var(--dup);background:var(--dup-soft);border-radius:8px;padding:8px 10px;display:none}
+details.adv summary{cursor:pointer;font-size:13px;color:var(--ink2);margin:12px 0 8px}
+
+/* combobox */
+.combo{position:relative}
+.combo .cv{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:#fff;padding:0 8px 0 10px;cursor:pointer;min-height:38px}
+.combo .cv.disabled{background:#f3f1ec;color:var(--ink3);cursor:not-allowed}
+.combo .cv span{flex:1;font-family:var(--mono);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.combo .cv .ph{font-family:inherit;color:var(--ink3)}
+.combo .cv i{font-style:normal;color:var(--ink3)}
+.pop{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(30,25,15,.14);display:none;overflow:hidden}
+.pop.open{display:block;animation:drop .14s ease-out}
+@keyframes drop{from{opacity:0;transform:translateY(-4px)}}
+.pop input{border:0;border-bottom:1px solid var(--line);border-radius:0;outline:none!important}
+.pop ul{list-style:none;margin:0;padding:4px 0;max-height:280px;overflow:auto}
+.pop li{padding:6px 12px;font:13px var(--mono);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.pop li:hover,.pop li.act{background:#f1eee6}
+.pop li.sel{font-weight:700}
+.pop li .tag{font:11px -apple-system,sans-serif;color:var(--ok);background:var(--ok-soft);border-radius:8px;padding:0 6px}
+.pop .grp{font:600 11.5px -apple-system,sans-serif;color:var(--ink3);padding:8px 12px 2px;cursor:default;background:none!important}
+.pop .custom{color:var(--def)}
+
+/* run */
+.runbar{display:flex;align-items:center;gap:16px;margin:24px 0}
+.btn{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--ink3)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);padding:12px 28px;font-size:15.5px;font-weight:650}
+.btn.primary:disabled{opacity:.4;cursor:not-allowed}
+.btn.sm{padding:5px 10px;font-size:12.5px}
+.log{font:12.5px var(--mono);color:var(--ink2)}
+.spinner{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* results */
+#results{display:none}
+.rhead{display:flex;align-items:center;justify-content:space-between;margin:34px 0 14px;gap:10px;flex-wrap:wrap}
+.rhead h2{margin:0;font-size:20px}
+.paper h3{margin:0 0 2px;font-size:17px;word-break:break-all}
+.paper .meta{color:var(--ink3);font-size:12.5px;margin-bottom:16px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.metrics{grid-template-columns:1fr}}
+.metric{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fdfcf8}
+.metric .lab{font-size:12.5px;color:var(--ink2);font-weight:600}
+.metric .big{font:700 34px/1.15 -apple-system,sans-serif;font-variant-numeric:tabular-nums;margin:4px 0 8px}
+.metric.dup .big{color:var(--dup)} .metric.def .big{color:var(--def)}
+.track{position:relative;height:8px;background:#ece8de;border-radius:5px;margin-bottom:10px}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
+.track .tgt{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink)}
+.kv{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--ink2)}
+.kv b{font-variant-numeric:tabular-nums;color:var(--ink)}
+.kv .bad{color:var(--dup)} .kv .good{color:var(--ok)}
+.cats{margin-top:10px;display:grid;grid-template-columns:auto 1fr auto;gap:3px 10px;font-size:12px;align-items:center}
+.cats .bar{height:6px;border-radius:3px;background:var(--def);opacity:.75}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:18px 0 12px}
+.tabs button{font:inherit;border:0;background:none;padding:8px 14px;cursor:pointer;color:var(--ink3);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--ink);border-color:var(--ink);font-weight:650}
+.pane{display:none}.pane.on{display:block}
+textarea.prompt{width:100%;height:340px;font:12.5px/1.55 var(--mono);border:1px solid var(--line);border-radius:8px;padding:12px;background:#fcfbf7;resize:vertical}
+.acts{display:flex;gap:8px;margin-bottom:8px}
+.sent{border-left:3px solid var(--def);background:#f8fafc;padding:7px 11px;margin:6px 0;font-size:13.5px;border-radius:0 6px 6px 0}
+.sent .t{font-size:11.5px;color:var(--ink3);margin-bottom:2px}
+.pair{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px}
+.pair .s{font:600 12px var(--mono);color:var(--dup)}
+.md{font-size:13.5px;white-space:pre-wrap;background:#fcfbf7;border:1px solid var(--line);border-radius:8px;padding:14px;max-height:520px;overflow:auto}
+.none{color:var(--ink3);font-size:13px;padding:8px 0}
+
+.overlay{position:fixed;inset:0;background:rgba(29,28,26,.55);display:none;place-items:center;z-index:50;color:#fff;font-size:20px;font-weight:650;pointer-events:none}
+.overlay.on{display:grid}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 18px;border-radius:20px;font-size:13px;opacity:0;transition:.2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay">松开即可加入被测论文</div>
+<div class="toast" id="toast"></div>
+<div class="wrap">
+  <header>
+    <h1>papersim</h1>
+    <span class="sub">重复率 · 防御性语言率 · 专项优化提示词</span>
+  </header>
+
+  <!-- 1 文件 -->
+  <section class="card">
+    <h2><span class="n">1</span>放入论文</h2>
+    <p class="desc">拖入文件或文件夹，也可以点击选择。支持 PDF、TXT、MD、TEX。多篇被测论文会互相比对。</p>
+    <div class="zones">
+      <div class="zone" data-g="papers">
+        <div class="zt">被测论文</div><div class="zh">要检查的论文，可多篇</div>
+        <div class="chips"></div>
+        <div class="empty"><b>＋</b>拖到这里，或点击选择</div>
+      </div>
+      <div class="zone" data-g="corpus">
+        <div class="zt">比对库 <span class="optional">可选</span></div><div class="zh">往届或同题论文，只当比对来源</div>
+        <div class="chips"></div>
+        <div class="empty"><b>＋</b>拖入文件夹最方便</div>
+      </div>
+      <div class="zone" data-g="exclude">
+        <div class="zt">赛题原文 <span class="optional">可选</span></div><div class="zh">与题目相同的句子不计入重复</div>
+        <div class="chips"></div>
+        <div class="empty"><b>＋</b>题目 PDF</div>
+      </div>
+    </div>
+    <input type="file" id="picker" multiple accept=".pdf,.txt,.md,.tex" hidden>
+  </section>
+
+  <!-- 2 设置 -->
+  <section class="card">
+    <h2><span class="n">2</span>检测设置</h2>
+    <p class="desc">默认值适合大多数数模论文，一般不用改。</p>
+    <div class="grid2">
+      <div>
+        <label class="f">检测内容</label>
+        <div class="seg" id="mode">
+          <button data-v="" class="on">全部</button><button data-v="dup">只看重复率</button><button data-v="def">只看防御性语言</button>
+        </div>
+      </div>
+      <div>
+        <label class="f">改写相似阈值</label>
+        <div class="range"><input type="range" id="para" min="0.4" max="0.9" step="0.05" value="0.6"><output id="paraV">0.60</output></div>
+        <div class="hint">越低越敏感，同题套话也会被抓出来。</div>
+      </div>
+      <div>
+        <label class="f">防御率目标（摘要 / 正文）</label>
+        <div class="keyrow"><input type="number" id="tSum" value="10" min="0" max="100" step="1"><span>%</span><input type="number" id="tBody" value="8" min="0" max="100" step="1"><span>%</span></div>
+        <div class="hint">提示词会按这个目标要求 AI 修改。</div>
+      </div>
+      <div>
+        <label class="f">提示词</label>
+        <label class="check"><input type="checkbox" id="embedText"><span>附上论文全文<small>复制一次就能直接发给 AI，提示词会变长</small></span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 API -->
+  <section class="card">
+    <h2><span class="n">3</span>大模型 <span class="optional">可选</span></h2>
+    <p class="desc">不填也能检测和生成提示词。填好 key 后会自动识别服务商，并列出可用模型。</p>
+    <div class="grid2">
+      <div>
+        <label class="f">API Key</label>
+        <div class="keyrow">
+          <div class="kin"><input type="password" id="key" placeholder="sk-… 粘贴后自动识别" autocomplete="off" spellcheck="false"><button class="eye" id="eye" title="显示/隐藏">◉</button></div>
+          <span class="status" id="st"><span class="dot"></span><span id="stT">未填写</span></span>
+        </div>
+        <div class="errbox" id="err"></div>
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="remember"><span>记住 key<small>只保存在这台电脑的浏览器里</small></span></label>
+        <details class="adv" id="adv">
+          <summary>服务商与地址</summary>
+          <label class="f">服务商</label>
+          <select id="prov"><option value="">自动识别</option></select>
+          <label class="f" style="margin-top:10px">Base URL</label>
+          <input type="text" id="base" placeholder="自动识别后填入，也可以填自建网关" spellcheck="false">
+          <div class="hint">改了服务商或地址后会重新获取模型列表。</div>
+        </details>
+      </div>
+      <div>
+        <label class="f">对话模型</label>
+        <div class="combo" id="cmChat"></div>
+        <label class="f" style="margin-top:14px">向量模型 <span class="optional">可选</span></label>
+        <div class="combo" id="cmEmbed"></div>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:9px">
+          <label class="check" id="lReview"><input type="checkbox" id="oReview" checked><span>大模型复核防御句<small>补抓词典漏掉的隐晦免责句</small></span></label>
+          <label class="check" id="lEmbed"><input type="checkbox" id="oEmbed"><span>语义改写检测<small>需要向量模型，能抓到换了说法的段落</small></span></label>
+          <label class="check" id="lApply"><input type="checkbox" id="oApply"><span>直接生成修改建议<small>用提示词调用模型，每篇一次，较慢</small></span></label>
+        </div>
+        <div style="margin-top:12px"><button class="btn sm" id="testBtn">测试连接</button> <span class="log" id="testOut"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="runbar">
+    <button class="btn primary" id="run" disabled>开始检测</button>
+    <div class="spinner" id="spin"></div>
+    <div class="log" id="log">先放入至少一篇被测论文</div>
+  </div>
+
+  <section id="results">
+    <div class="rhead">
+      <h2>检测结果</h2>
+      <div style="display:flex;gap:8px">
+        <a class="btn sm" id="dlReport" target="_blank">打开完整报告</a>
+        <a class="btn sm" id="dlCsv">下载 CSV</a>
+        <a class="btn sm" id="dlJson">下载 JSON</a>
+      </div>
+    </div>
+    <div id="papers"></div>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = (x, d=1) => x == null ? "—" : (x*100).toFixed(d) + "%";
+const ALLOWED = /\.(pdf|txt|md|tex)$/i;
+const files = {papers: [], corpus: [], exclude: []};
+let mode = "", jobId = null;
+
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("on"),1800); }
+const store = { get(k){ try{return localStorage.getItem(k)}catch(e){return null} }, set(k,v){ try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,v) }catch(e){} } };
+
+/* ---------------- 文件 ---------------- */
+function addFiles(g, list){
+  let n = 0;
+  for (const f of list){
+    if (!ALLOWED.test(f.name)) continue;
+    if (files[g].some(x => x.name === f.name && x.size === f.size)) continue;
+    files[g].push(f); n++;
+  }
+  if (!n && list.length) toast("没有可用的文件（支持 PDF / TXT / MD / TEX）");
+  render();
+}
+function render(){
+  document.querySelectorAll(".zone").forEach(z => {
+    const g = z.dataset.g, box = z.querySelector(".chips");
+    box.innerHTML = files[g].map((f, i) => `<div class="chip"><span class="ext">${esc(f.name.split(".").pop())}</span><span class="fn" title="${esc(f.name)}">${esc(f.name)}</span><span class="sz">${(f.size/1024).toFixed(0)} KB</span><button class="x" data-i="${i}" title="移除">×</button></div>`).join("");
+    z.querySelector(".empty").style.display = files[g].length ? "none" : "";
+    box.querySelectorAll(".x").forEach(b => b.onclick = e => { e.stopPropagation(); files[g].splice(+b.dataset.i, 1); render(); });
+  });
+  const ok = files.papers.length > 0;
+  $("#run").disabled = !ok || $("#run").dataset.busy === "1";
+  if (!$("#run").dataset.busy) $("#log").textContent = ok ? `已放入 ${files.papers.length} 篇被测论文${files.corpus.length ? `、${files.corpus.length} 篇比对库` : ""}` : "先放入至少一篇被测论文";
+}
+async function entriesToFiles(items){
+  const out = [];
+  async function walk(entry){
+    if (entry.isFile) out.push(await new Promise(r => entry.file(r)));
+    else if (entry.isDirectory){
+      const reader = entry.createReader();
+      let batch;
+      do { batch = await new Promise(r => reader.readEntries(r)); for (const e of batch) await walk(e); } while (batch.length);
+    }
+  }
+  const entries = [...items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!entries.length) return null;
+  for (const e of entries) await walk(e);
+  return out;
+}
+async function handleDrop(e, g){
+  e.preventDefault(); e.stopPropagation();
+  const list = (e.dataTransfer.items && await entriesToFiles(e.dataTransfer.items)) || [...e.dataTransfer.files];
+  addFiles(g, list);
+}
+let pickTarget = "papers";
+document.querySelectorAll(".zone").forEach(z => {
+  z.onclick = () => { pickTarget = z.dataset.g; $("#picker").click(); };
+  z.ondragover = e => { e.preventDefault(); e.stopPropagation(); z.classList.add("drag"); $("#overlay").classList.remove("on"); };
+  z.ondragleave = () => z.classList.remove("drag");
+  z.ondrop = e => { z.classList.remove("drag"); handleDrop(e, z.dataset.g); };
+});
+$("#picker").onchange = e => { addFiles(pickTarget, [...e.target.files]); e.target.value = ""; };
+let dragDepth = 0;
+window.addEventListener("dragenter", e => { if ([...(e.dataTransfer?.types||[])].includes("Files")) { dragDepth++; $("#overlay").classList.add("on"); } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("#overlay").classList.remove("on"); } });
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => { dragDepth = 0; $("#overlay").classList.remove("on"); handleDrop(e, "papers"); });
+
+/* ---------------- 设置 ---------------- */
+document.querySelectorAll("#mode button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b)); mode = b.dataset.v;
+});
+$("#para").oninput = e => $("#paraV").textContent = (+e.target.value).toFixed(2);
+
+/* ---------------- 下拉选择 ---------------- */
+function Combo(el, {placeholder, onChange}){
+  el.innerHTML = `<div class="cv disabled"><span class="ph">${placeholder}</span><i>▾</i></div><div class="pop"><input type="text" placeholder="搜索或直接输入模型名"><ul></ul></div>`;
+  const cv = el.querySelector(".cv"), pop = el.querySelector(".pop"), q = pop.querySelector("input"), ul = pop.querySelector("ul");
+  const st = {groups: [], value: "", def: "", enabled: false, act: -1};
+  function draw(){
+    const k = q.value.trim().toLowerCase();
+    let html = "", idx = 0;
+    for (const g of st.groups){
+      const items = g.items.filter(x => !k || x.toLowerCase().includes(k));
+      if (!items.length) continue;
+      if (st.groups.length > 1 || g.title) html += `<li class="grp">${esc(g.title)} · ${items.length}</li>`;
+      for (const x of items) html += `<li data-v="${esc(x)}" data-i="${idx++}" class="${x===st.value?"sel":""}">${esc(x)}${x===st.def?'<span class="tag">推荐</span>':""}</li>`;
+    }
+    if (k && !st.groups.some(g => g.items.includes(q.value.trim()))) html += `<li data-v="${esc(q.value.trim())}" data-i="${idx++}" class="custom">使用「${esc(q.value.trim())}」</li>`;
+    ul.innerHTML = html || `<li class="grp">没有匹配的模型</li>`;
+    st.act = -1;
+    ul.querySelectorAll("li[data-v]").forEach(li => li.onmousedown = e => { e.preventDefault(); set(li.dataset.v); close(); });
+  }
+  function set(v){ st.value = v; cv.querySelector("span").outerHTML = v ? `<span>${esc(v)}</span>` : `<span class="ph">${placeholder}</span>`; onChange && onChange(v); }
+  function open(){ if (!st.enabled) return; pop.classList.add("open"); q.value = ""; draw(); setTimeout(()=>q.focus(), 0); const s = ul.querySelector(".sel"); s && s.scrollIntoView({block:"center"}); }
+  function close(){ pop.classList.remove("open"); }
+  cv.onclick = () => pop.classList.contains("open") ? close() : open();
+  q.oninput = draw;
+  q.onkeydown = e => {
+    const lis = [...ul.querySelectorAll("li[data-v]")];
+    if (e.key === "ArrowDown" || e.key === "ArrowUp"){ e.preventDefault(); st.act = Math.max(0, Math.min(lis.length-1, st.act + (e.key==="ArrowDown"?1:-1))); lis.forEach((l,i)=>l.classList.toggle("act", i===st.act)); lis[st.act]?.scrollIntoView({block:"nearest"}); }
+    else if (e.key === "Enter"){ e.preventDefault(); const li = lis[st.act] || lis[0]; if (li){ set(li.dataset.v); close(); } }
+    else if (e.key === "Escape") close();
+  };
+  q.onblur = () => setTimeout(close, 120);
+  return {
+    load(groups, def, autoOpen){ st.groups = groups; st.def = def || ""; st.enabled = true; cv.classList.remove("disabled");
+      const all = groups.flatMap(g => g.items); set(all.includes(st.value) ? st.value : (def || "")); if (autoOpen) open(); },
+    disable(text){ st.groups = []; st.enabled = false; cv.classList.add("disabled"); set(""); if (text) cv.querySelector("span").textContent = text; },
+    enableManual(){ st.enabled = true; cv.classList.remove("disabled"); },
+    get value(){ return st.value; }, set value(v){ set(v); }
+  };
+}
+const chat = Combo($("#cmChat"), {placeholder: "填好 key 后自动列出", onChange: v => { store.set("ps_model", v || null); syncOpts(); }});
+const embed = Combo($("#cmEmbed"), {placeholder: "不使用", onChange: v => { store.set("ps_embed", v || null); syncOpts(); }});
+function syncOpts(){
+  const hasChat = !!chat.value, hasEmbed = !!embed.value;
+  for (const [l, i, ok] of [["#lReview","#oReview",hasChat],["#lApply","#oApply",hasChat],["#lEmbed","#oEmbed",hasEmbed]]){
+    $(l).classList.toggle("disabled", !ok); $(i).disabled = !ok;
+  }
+  if (hasEmbed && !$("#oEmbed")._touched) $("#oEmbed").checked = true;
+}
+$("#oEmbed").onchange = e => e.target._touched = true;
+
+/* ---------------- API 识别 ---------------- */
+let PROVS = [], seq = 0, timer = null;
+fetch("/api/providers").then(r => r.json()).then(list => {
+  PROVS = list;
+  $("#prov").innerHTML = `<option value="">自动识别</option>` + list.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("") + `<option value="custom">自定义地址</option>`;
+});
+function status(kind, text){ const s = $("#st"); s.className = "status " + kind; $("#stT").textContent = text; }
+function showErr(t){ const e = $("#err"); e.textContent = t || ""; e.style.display = t ? "block" : "none"; }
+
+async function detectModels(autoOpen = true){
+  const key = $("#key").value.trim();
+  const my = ++seq;
+  showErr("");
+  if (!key){ status("", "未填写"); chat.disable(); embed.disable(); syncOpts(); return; }
+  if (key.length < 16){ status("", "key 太短"); return; }
+  status("busy", "识别中…");
+  const base = $("#base").value.trim();
+  try{
+    const r = await fetch("/api/models", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({key, base: base || null})}).then(r => r.json());
+    if (my !== seq) return;
+    if (r.base_url && !base) $("#base").value = r.base_url;
+    if (r.provider) $("#prov").value = PROVS.some(p => p.id === r.provider) ? r.provider : "custom";
+    if (r.ok){
+      const n = r.chat.length;
+      status("ok", `${r.provider_name} · ${n} 个对话模型`);
+      const saved = store.get("ps_model");
+      chat.load([{title: "对话模型", items: r.chat}], r.chat.includes(saved) ? saved : r.default_chat, autoOpen);
+      if (r.embed.length){ const se = store.get("ps_embed"); embed.load([{title: "向量模型", items: r.embed}], r.embed.includes(se) ? se : ""); }
+      else embed.disable("该服务商没有向量模型");
+      if (r.other && r.other.length) $("#cmChat").title = `另有 ${r.other.length} 个非对话模型已隐藏`;
+    } else {
+      status("err", r.provider_name ? `${r.provider_name} · 无法获取列表` : "识别失败");
+      showErr(r.error);
+      if (r.chat && r.chat.length){ chat.load([{title: "常用模型（未验证）", items: r.chat}], r.chat[0], false); }
+      else { chat.disable("可在服务商与地址里手动填写"); chat.enableManual(); }
+      if (!$("#adv").open) $("#adv").open = true;
+    }
+  }catch(e){
+    if (my !== seq) return;
+    status("err", "本地服务无响应"); showErr(String(e));
+  }
+  syncOpts();
+}
+$("#key").addEventListener("input", () => {
+  clearTimeout(timer);
+  store.set("ps_key", $("#remember").checked ? $("#key").value.trim() : null);
+  timer = setTimeout(detectModels, 650);
+});
+$("#key").addEventListener("paste", () => { clearTimeout(timer); timer = setTimeout(detectModels, 50); });
+$("#eye").onclick = () => { const k = $("#key"); k.type = k.type === "password" ? "text" : "password"; };
+$("#remember").onchange = e => { store.set("ps_remember", e.target.checked ? "1" : null); store.set("ps_key", e.target.checked ? $("#key").value.trim() : null); };
+$("#prov").onchange = e => {
+  const p = PROVS.find(x => x.id === e.target.value);
+  $("#base").value = p ? p.base : "";
+  if (e.target.value === "custom") { $("#base").focus(); return; }
+  detectModels();
+};
+$("#base").addEventListener("change", () => detectModels());
+
+$("#testBtn").onclick = async () => {
+  if (!chat.value){ $("#testOut").textContent = "请先选择模型"; return; }
+  $("#testOut").textContent = "测试中…";
+  const r = await fetch("/api/test", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({key: $("#key").value.trim(), base: $("#base").value.trim(), model: chat.value})}).then(r => r.json());
+  $("#testOut").textContent = r.ok ? `✓ 可用（模型回复：${r.reply}）` : `✗ ${r.error}`;
+  $("#testOut").style.color = r.ok ? "var(--ok)" : "var(--dup)";
+};
+
+/* 恢复本机保存的 key */
+if (store.get("ps_remember")){ $("#remember").checked = true; const k = store.get("ps_key"); if (k){ $("#key").value = k; setTimeout(() => detectModels(false), 300); } }
+chat.disable(); embed.disable(); syncOpts();
+
+/* ---------------- 运行 ---------------- */
+const readB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res({name: f.name, data: r.result}); r.onerror = rej; r.readAsDataURL(f); });
+
+$("#run").onclick = async () => {
+  const btn = $("#run");
+  btn.dataset.busy = "1"; btn.disabled = true; $("#spin").style.display = "block"; $("#log").textContent = "上传文件…";
+  try{
+    const payload = {
+      papers: await Promise.all(files.papers.map(readB64)),
+      corpus: await Promise.all(files.corpus.map(readB64)),
+      exclude: await Promise.all(files.exclude.map(readB64)),
+      options: {only: mode, para_threshold: +$("#para").value, target_summary: $("#tSum").value/100, target_body: $("#tBody").value/100,
+                embed_text: $("#embedText").checked,
+                llm_review: chat.value && $("#oReview").checked, llm_embed: embed.value && $("#oEmbed").checked, apply: chat.value && $("#oApply").checked},
+      api: chat.value ? {key: $("#key").value.trim(), base: $("#base").value.trim(), model: chat.value, embed_model: embed.value || null} : null
+    };
+    const r = await fetch("/api/run", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload)}).then(r => r.json());
+    if (r.error) throw new Error(r.error);
+    jobId = r.job;
+    await poll();
+  }catch(e){ $("#log").textContent = "出错：" + e.message; $("#log").style.color = "var(--dup)"; }
+  btn.dataset.busy = ""; $("#spin").style.display = "none"; render();
+};
+async function poll(){
+  $("#log").style.color = "";
+  for(;;){
+    const j = await fetch("/api/job/" + jobId).then(r => r.json());
+    $("#log").textContent = j.log.length ? j.log[j.log.length-1] : "处理中…";
+    if (j.status === "done"){ showResults(j.result); $("#log").textContent = "完成"; return; }
+    if (j.status === "error") throw new Error(j.error);
+    await new Promise(r => setTimeout(r, 700));
+  }
+}
+
+/* ---------------- 结果 ---------------- */
+function track(x, color, tgt, scale = 1){
+  const w = Math.min(100, (x || 0) / scale * 100);
+  return `<div class="track"><div class="fill" style="width:${w}%;background:${color}"></div>${tgt != null ? `<div class="tgt" style="left:${Math.min(100, tgt/scale*100)}%" title="目标 ${pct(tgt,0)}"></div>` : ""}</div>`;
+}
+function showResults(rows){
+  $("#results").style.display = "block";
+  $("#dlReport").href = `/api/job/${jobId}/report.html`;
+  $("#dlCsv").href = `/api/job/${jobId}/summary.csv`;
+  $("#dlJson").href = `/api/job/${jobId}/report.json`;
+  const tS = $("#tSum").value/100, tB = $("#tBody").value/100;
+  $("#papers").innerHTML = rows.map((p, k) => {
+    const d = p.dup, f = p.def;
+    const dupBox = d ? `<div class="metric dup"><div class="lab">总重复率</div><div class="big">${pct(d.total)}</div>${track(d.total, "var(--dup)", null, .5)}
+      <div class="kv"><span>逐字 <b>${pct(d.exact)}</b></span><span>改写 <b>${pct(d.paraphrase)}</b></span><span>赛题引用 <b>${pct(d.excluded)}</b></span>
+      ${Object.keys(d.by_source).length ? `<span>最相似：<b>${esc(Object.keys(d.by_source)[0])}</b> ${pct(Object.values(d.by_source)[0])}</span>` : ""}</div></div>` : "";
+    const cls = (x, t) => x == null ? "" : (x <= t ? "good" : "bad");
+    const defBox = f ? `<div class="metric def"><div class="lab">防御性语言率</div><div class="big">${pct(f.rate)}</div>${track(f.rate, "var(--def)", tB, .5)}
+      <div class="kv"><span>摘要 <b class="${cls(f.summary,tS)}">${pct(f.summary,0)}</b> / 目标 ${pct(tS,0)}</span><span>正文 <b class="${cls(f.body,tB)}">${pct(f.body,0)}</b> / 目标 ${pct(tB,0)}</span>
+      <span>强度 <b>${f.intensity.toFixed(1)}</b> 分/千词</span>${f.llm_rate != null ? `<span>大模型复核 <b>${pct(f.llm_rate)}</b></span>` : ""}</div>
+      <div class="cats">${Object.entries(f.by_category).map(([c,v]) => `<span>${esc(c)}</span><div class="bar" style="width:${Math.max(2,v*200)}%"></div><span>${pct(v,0)}</span>`).join("")}</div></div>` : "";
+    const tabs = [["prompt","优化提示词"], ...(p.suggestion ? [["sug","AI 修改建议"]] : []), ...(f ? [["defs",`防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs",`相似句 ${d.pairs.length}`]] : [])];
+    return `<section class="card paper" data-k="${k}">
+      <h3>${esc(p.name)}</h3><div class="meta">${p.words} 词 · ${p.sentences} 句</div>
+      <div class="metrics">${dupBox}${defBox}</div>
+      <div class="tabs">${tabs.map(([id,t],i) => `<button data-t="${id}" class="${i?"":"on"}">${t}</button>`).join("")}</div>
+      <div class="pane on" data-p="prompt">${p.prompt ? `<div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p.prompt)}</textarea>` : `<div class="none">未生成</div>`}</div>
+      ${p.suggestion ? `<div class="pane" data-p="sug"><div class="acts"><button class="btn sm cps">复制</button></div><div class="md">${esc(p.suggestion)}</div></div>` : ""}
+      ${f ? `<div class="pane" data-p="defs">${f.hits.length ? f.hits.map(h => `<div class="sent"><div class="t">${h.zone} · ${h.cats.join("、")} · 得分 ${h.score}</div>${esc(h.text)}</div>`).join("") : `<div class="none">没有检出防御性句</div>`}</div>` : ""}
+      ${d ? `<div class="pane" data-p="pairs">${d.pairs.length ? d.pairs.map(x => `<div class="pair"><span class="s">${pct(x.sim,0)}</span> · 来源 ${esc(x.source)}<br>本文：${esc(x.text)}<br>来源：${esc(x.source_text)}</div>`).join("") : `<div class="none">没有相似句</div>`}</div>` : ""}
+    </section>`;
+  }).join("");
+  document.querySelectorAll(".paper").forEach(card => {
+    const p = rows[+card.dataset.k];
+    card.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+      card.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+      card.querySelectorAll(".pane").forEach(x => x.classList.toggle("on", x.dataset.p === b.dataset.t));
+    });
+    card.querySelector(".cp")?.addEventListener("click", () => copy(p.prompt));
+    card.querySelector(".cps")?.addEventListener("click", () => copy(p.suggestion));
+    card.querySelector(".dl")?.addEventListener("click", () => {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([p.prompt], {type: "text/markdown"}));
+      a.download = `${p.name}_优化提示词.md`; a.click();
+    });
+  });
+  $("#results").scrollIntoView({behavior: "smooth"});
+}
+async function copy(t){
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){ const x = document.createElement("textarea"); x.value = t; document.body.appendChild(x); x.select(); document.execCommand("copy"); x.remove(); }
+  toast("已复制");
+}
+render();
+</script>
+</body>
+</html>

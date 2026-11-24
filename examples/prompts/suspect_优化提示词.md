@@ -10,7 +10,7 @@
 3. 保留论文的 Report on Use of AI Tools（竞赛要求如实披露 AI 使用）。
 4. 不做同义词替换式的“降重”；每处修改都必须让论证更扎实或更有本队特色。
 
-## 一、底气：防御性语言优化
+## 底气：防御性语言优化
 诊断：全文防御性语言率 **35.7%**（摘要 50%，正文 30%），防御强度 47.6 分/千词。目标：摘要 ≤ 10%，正文 ≤ 8%。
 
 评委读到满篇“这不是预测”“仅为示意”“无法识别”时，会觉得作者对自己的结果没底气。改写原则：
@@ -36,7 +36,7 @@
 | 4 | 正文第8句 | 对照纠偏、范围限定 | We only consider transport cost, not construction cost or reliability. |
 | 5 | 正文第11句 | 不可识别/局限声明 | The cost parameters cannot be verified without independent industry data. |
 
-## 二、区分度：去同质化
+## 区分度：去同质化
 大家用同一个 AI 写同一道题，表述和段落结构会高度趋同。评委一天看几十篇，雷同的段落会直接被略过。
 诊断：总重复率 **43.9%**（逐字 24.9%，改写相似 19.0%）。最相似的来源：original（43.9%）
 
@@ -62,8 +62,8 @@
 | 1 | In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site. | original | The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site. | 76% |
 | 2 | When no deadline is imposed the elevator chain is the cheapest choice. | original | The elevator chain is the cheapest option when no deadline is imposed. | 75% |
 
-## 三、输出格式
-1. 先给出 3 个差异化切入角度（如果有第二部分）。
+## 输出格式
+1. 先给出 3 个差异化切入角度（如果有“区分度”部分）。
 2. 再用表格逐条给出：`原句 | 修改后 | 修改理由（对应上面哪条原则）`。
 3. 最后给出改写后的**摘要全文**（这是评委最先读、也最影响印象的部分）。
 4. 列出所有 `[需补充分析：…]` 的位置，作为作者的待办清单。

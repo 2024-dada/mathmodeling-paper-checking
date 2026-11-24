@@ -4,10 +4,8 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .defensive import analyze as def_analyze, llm_review, load_lexicon
-from .duplication import check_all
 from .extract import Document
-from .prompt import build as build_prompt
+from .pipeline import Options, run
 from .report import write_csv, write_html, write_json
 
 SUPPORTED = {".pdf", ".txt", ".md", ".tex"}
@@ -55,57 +53,34 @@ def main(argv=None):
     docs = [Document.load(p, drop_references=drop) for p in files]
     corpus = [Document.load(p, drop_references=drop) for p in _collect(a.corpus)]
     exclude = [Document.load(p, drop_references=False) for p in _collect(a.exclude)]
-    if a.only != "def" and len(docs) + len(corpus) < 2:
-        sys.exit("重复率至少需要两篇（被测论文 + 比对库）。只测防御性语言请加 --only def")
 
     client = None
-    if a.llm:
+    if a.llm or a.apply:
         from .llm import LLMClient
         try:
             client = LLMClient()
         except RuntimeError as e:
-            print(f"[warn] {e}，跳过 LLM", file=sys.stderr)
+            print(f"[warn] {e}，跳过大模型步骤", file=sys.stderr)
 
-    lex = load_lexicon(a.lexicon)
-    if a.threshold is not None:
-        lex["threshold"] = a.threshold
+    opt = Options(only=a.only, n=a.n, para_threshold=a.para_threshold, lexicon=a.lexicon, threshold=a.threshold,
+                  llm_review=a.llm, llm_embed=a.llm, apply=a.apply, prompt=not a.no_prompt,
+                  embed_text=a.embed_text, target_summary=a.target_summary, target_body=a.target_body)
+    try:
+        res = run(docs, corpus, exclude, opt, client, log=lambda m: print(f"[papersim] {m}", file=sys.stderr))
+    except ValueError as e:
+        sys.exit(str(e))
+    dup, dfn = res.dup, res.dfn
 
-    dup = [None] * len(docs)
-    if a.only != "def":
-        embed = client.embed if client and client.embed_model else None
-        dup = check_all(docs, corpus, exclude, n=a.n, para_threshold=a.para_threshold, embed_fn=embed)
-
-    dfn = [None] * len(docs)
-    if a.only != "dup":
-        dfn = [def_analyze(d, lex) for d in docs]
-        if client:
-            for d, r in zip(docs, dfn):
-                print(f"[llm] 复核防御句：{d.name}", file=sys.stderr)
-                llm_review(d, r, client)
-
-    prompts = [None] * len(docs)
-    if not a.no_prompt:
+    if opt.prompt:
         pdir = Path(a.prompt_dir or Path(a.out).resolve().parent / "prompts")
         pdir.mkdir(parents=True, exist_ok=True)
-        for k, (d, u, f) in enumerate(zip(docs, dup, dfn)):
-            prompts[k] = build_prompt(d, u, f, lex, a.target_summary, a.target_body, embed_text=a.embed_text)
-            (pdir / f"{d.name}_优化提示词.md").write_text(prompts[k], encoding="utf-8")
-            if a.apply:
-                if client is None:
-                    from .llm import LLMClient
-                    try:
-                        client = LLMClient()
-                    except RuntimeError as e:
-                        print(f"[warn] {e}，--apply 跳过", file=sys.stderr)
-                        a.apply = False
-                        continue
-                print(f"[llm] 执行优化提示词：{d.name}", file=sys.stderr)
-                full = prompts[k] if a.embed_text else prompts[k] + "\n\n## 附：论文全文\n\n" + d.text
-                (pdir / f"{d.name}_AI修改建议.md").write_text(client.chat_text(full), encoding="utf-8")
+        for d, pr, sg in zip(docs, res.prompts, res.suggestions):
+            (pdir / f"{d.name}_优化提示词.md").write_text(pr, encoding="utf-8")
+            if sg:
+                (pdir / f"{d.name}_AI修改建议.md").write_text(sg, encoding="utf-8")
         print(f"优化提示词已写入：{pdir}")
 
-    meta = {"n_corpus": len(corpus), "n_exclude": len(exclude), "n": a.n}
-    write_html(a.out, docs, dup, dfn, lex, meta, prompts)
+    write_html(a.out, docs, dup, dfn, res.lex, res.meta, res.prompts)
     if a.json:
         write_json(a.json, docs, dup, dfn)
     if a.csv:
