@@ -35,3 +35,5 @@ header{align-items:center;border-bottom:1px solid var(--line);padding-bottom:26p
 footer{max-width:none;margin-top:40px;background:rgba(16,23,40,.88);padding:22px;border-radius:8px}.paper{scroll-margin-top:24px}
 @media(max-width:760px){.wrap{padding:24px 16px 50px}.hero{min-height:0;padding:44px 0}.hero h2{font-size:44px}.hero p{font-size:14px}.hero-caption{font-size:9px}.tagline{width:100%;order:3}.card{padding:22px 18px}.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metrics{grid-template-columns:1fr}.hero-actions{flex-wrap:wrap}.veil{background:rgba(12,19,34,.8)}.rhead h2{font-size:24px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+.pdf-download{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:30px;border:1px solid var(--line2);border-radius:12px;background:var(--panel)}.pdf-download h3{margin:0 0 8px}.pdf-download p{color:var(--ink2);margin:0;max-width:65ch}.pdf-download button{flex-shrink:0}@media(max-width:760px){.pdf-download{flex-direction:column;align-items:stretch;padding:22px}.pdf-download button{width:100%}}

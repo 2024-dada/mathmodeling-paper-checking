@@ -1,5 +1,6 @@
 import * as E from "./engine.js";
 import { pdfToText } from "./pdftext.js";
+import { reportPdf } from "./reportpdf.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -284,6 +285,7 @@ chat.disable(); embed.disable(); syncOpts();
 $("#run").onclick = async () => {
   const btn = $("#run"), log = $("#log");
   last = null;
+  $("#dlPdf").disabled = true;
   $("#runSummary").innerHTML = '<h3>检测进行中</h3><p>本次完成后更新参数与结果。</p>';
   $("#papers").innerHTML = "";
   const settings = { mode: mode || "全部", level, threshold: +$("#para").value,
@@ -335,6 +337,7 @@ $("#run").onclick = async () => {
       showUsage(usage);
       if (costByBalance && costByBalance.amount === 0 && usage.calls) $("#costS").textContent = "余额暂未变化（部分服务商扣费有延迟，稍后点“刷新”）";
     }
+    last.accountText = $("#meter").innerText;
     showResults(last);
     log.textContent = "完成";
   } catch (e) { $("#runSummary").textContent = "本次检测未完成：" + e.message; log.textContent = "出错：" + e.message; log.style.color = "var(--dup)"; console.error(e); }
@@ -421,6 +424,7 @@ function summaryPanel(r) {
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
 }
 function showResults(r) {
+  $("#dlPdf").disabled = false;
   $("#results").style.display = "block";
   $("#runSummary").innerHTML = summaryPanel(r);
   $("#papers").innerHTML = r.docs.map((_, k) => paperCard(r, k)).join("");
@@ -474,3 +478,54 @@ $("#dlReport").onclick = () => {
   download(`papersim_报告_${stamp()}.html`, html, "text/html");
 };
 render();
+
+function pdfBlocks(r) {
+  const blocks = [{ heading: true, text: "综合检测结果" },
+    { text: "模板化表达句占比只用于观察写作特征。AI 生成率与 GPT 写作率尚不可判定。" },
+    { heading: true, text: "本次参数" }];
+  const summary = document.createElement("div"); summary.innerHTML = summaryPanel(r);
+  summary.querySelectorAll(".summary-grid > div").forEach(el => blocks.push({ text: el.querySelector("dt").textContent + "：" + el.querySelector("dd").textContent }));
+  blocks.push({ heading: true, text: "账户与本次消耗" }, { text: r.accountText || "未调用大模型" });
+  r.docs.forEach((doc, i) => {
+    const d = r.dup[i], f = r.dfn[i], s = r.style[i];
+    blocks.push({ heading: true, text: `${i + 1}. ${doc.name}` }, { text: `${doc.nWords} 词 / ${doc.sentences.length} 句` });
+    if (d) {
+      blocks.push({ text: `总重复率 ${pct(d.total)}；逐字 ${pct(d.exact)}；改写 ${pct(d.paraphrase)}；赛题引用 ${pct(d.excluded)}` });
+      Object.entries(d.bySource).forEach(([name, rate]) => blocks.push({ text: `来源：${name} / ${pct(rate)}` }));
+    }
+    if (f) {
+      blocks.push({ text: `防御性语言率 ${pct(f.rate)}；摘要 ${pct(f.summary)}；正文 ${pct(f.body)}；强度 ${f.intensity.toFixed(2)} 分/千词；大模型复核 ${pct(f.llmRate)}` });
+      Object.entries(f.byCategory).forEach(([key, rate]) => blocks.push({ text: `${r.lex.categories[key].label}：${pct(rate)}` }));
+    }
+    blocks.push({ text: `模板化表达句占比 ${pct(s.rate)}（${s.hits.length}/${s.total} 句）。AI 生成率：尚不可判定；GPT 写作率：尚不可判定。` }, { heading: true, text: "修改建议" });
+    advice(r, i).forEach(text => blocks.push({ text }));
+    if (s.hits.length) blocks.push({ heading: true, text: "模板表达与命中依据" });
+    s.hits.forEach(h => blocks.push({ text: `第 ${h.index + 1} 句 / ${h.signals.join("、")}
+${h.text}` }));
+    if (f?.hits.length) blocks.push({ heading: true, text: "防御性语言与依据" });
+    f?.hits.forEach(h => blocks.push({ text: `第 ${h.index + 1} 句 / 得分 ${h.score} / ${h.categories.map(c => r.lex.categories[c].label).join("、")}
+${h.text}` }));
+    f?.llmHits.forEach(h => blocks.push({ text: `大模型额外复核 / ${h.category}
+${h.text}` }));
+    if (d?.pairs.length) blocks.push({ heading: true, text: "相似句与来源" });
+    d?.pairs.forEach(([rate, text, source, original]) => blocks.push({ text: `相似度 ${pct(rate)} / 来源 ${source}
+本文：${text}
+来源原文：${original}` }));
+    blocks.push({ heading: true, text: "专项优化提示词" }, { text: r.prompts[i] });
+    blocks.push({ heading: true, text: "AI 修改建议" }, { text: r.suggestions[i] || "本次未生成模型修改建议。上方修改建议由检测规则给出。" });
+  });
+  return blocks;
+}
+$("#dlPdf").onclick = async () => {
+  if (!last) return;
+  const btn = $("#dlPdf"), r = last, blocks = pdfBlocks(r);
+  btn.disabled = true;
+  try {
+    btn.textContent = "正在生成 PDF…";
+    const blob = await reportPdf(blocks, n => btn.textContent = `正在生成 PDF · ${n} 页`);
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = `papersim_综合报告_${stamp()}.pdf`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000); toast("PDF 已生成，正在下载");
+  } catch (e) { toast("PDF 导出失败：" + e.message); console.error(e); }
+  finally { btn.textContent = "一键下载 PDF 报告 ↓"; btn.disabled = !last; }
+};
