@@ -1,0 +1,12 @@
+Summary
+We model the delivery of construction material to a lunar base using two transport modes. A maximum-flow network gives the annual capacity of each mode, and a mixed-integer program chooses the cheapest allocation for every deadline. The combined system finishes in 101 years, while the elevator alone needs 187 years. Higher launch cadence shortens the schedule but raises the variable cost sharply.
+Keywords: logistics, maximum flow, integer programming
+
+1 Introduction
+The colony requires one hundred million tonnes of material. Each harbor lifts cargo to an apex anchor, and rockets carry it onward to the Moon. Ground rockets launch directly from ten sites around the world. We compare the completion time and the transport cost of three delivery plans.
+
+2 Model
+The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site. Edge capacities encode the annual lift limit of each harbor and the launch limit of each site. The minimum cut of this network bounds the annual throughput of the whole system. We then fix a deadline and minimize the total transport cost subject to the capacity constraints.
+
+3 Results
+The elevator chain is the cheapest option when no deadline is imposed. The mixed system is the fastest option and costs about forty-two trillion dollars. Rockets alone are both slower than the mixed system and more expensive than the elevator.

@@ -1,0 +1,112 @@
+{
+  "_说明": "防御性语言词典。patterns 中每项是正则字符串，或 [正则, 权重]；未写权重时用类别的 weight。一句话在某类的得分 = 该类命中的不同正则的权重之和，上限 cap（默认 1）。句子总分 = 各类得分之和，>= threshold 记为防御性句。",
+  "threshold": 1.0,
+  "categories": {
+    "disclaimer": {
+      "label": "否定式免责",
+      "desc": "声明结果“不是”什么：不是估计、不是预测、不应理解为……",
+      "weight": 1.0,
+      "patterns": [
+        "\\b(is|are|was|were|does|do|did)\\s+not\\s+(an?\\s+|the\\s+)?([\\w-]+\\s+){0,2}(estimate|prediction|forecast|measure|guarantee|proof|quotation|claim|substitute|recommendation|test)s?\\b",
+        "\\bnot\\s+(an?\\s+|the\\s+)?([\\w-]+\\s+){0,2}(estimate|prediction|forecast|quotation|guarantee|projection)s?\\b",
+        "\\bnot\\s+(out-of-sample|causal|definitive|complete|exhaustive|predictive)\\b",
+        "\\b(is|are|was|were|should|must|cannot|can't|need)\\s+not\\s+(be\\s+)?(treated|substituted|intended|meant|interpreted|regarded|considered|read|taken|viewed|understood)\\b",
+        "\\b(should|must|cannot|can't)\\s+(not\\s+)?be\\s+(interpreted|read|taken|treated|viewed|understood)\\s+as\\b",
+        "\\bdo(es)?\\s+not\\s+(imply|represent|indicate|establish|estimate|predict|measure|reflect|claim|prove|mean|address|capture|identify|infer|attempt|account for|guarantee)\\b",
+        "\\b(best|should be|is to be|are to be)\\s+(treated|read|interpreted|viewed|understood)\\s+as\\b",
+        "\\bno\\s+(claim|guarantee|causal)\\b",
+        "并非",
+        "不代表",
+        "不意味着",
+        "不应(被)?(理解|解读|视为|看作)",
+        "不构成",
+        "不是对.{0,15}(估计|预测)",
+        "不能(被)?(视为|理解为|代表)"
+      ]
+    },
+    "contrast": {
+      "label": "对照纠偏",
+      "desc": "用“A 而非 B / 区分 A 与 B”主动划清边界",
+      "weight": 1.0,
+      "patterns": [
+        "\\brather than\\b",
+        "\\binstead of\\b",
+        "\\bas opposed to\\b",
+        "[,;]\\s*not\\s+(an?\\s+|the\\s+)?[\\w-]+",
+        "\\bnot\\s+[\\w-]+(\\s+[\\w-]+){0,6},?\\s+but\\b",
+        "\\b(distinguish\\w*|distinction|difference between)\\b",
+        "而非",
+        "而不是",
+        "并不是.{0,20}而是",
+        "区别于",
+        "区分"
+      ]
+    },
+    "limitation": {
+      "label": "不可识别/局限声明",
+      "desc": "声明无法得到、无法识别、数据不可得、解不唯一",
+      "weight": 1.0,
+      "patterns": [
+        "\\bcannot\\s+(be\\s+)?(recover|identif|determin|observ|estimat|verif|select|infer|distinguish)\\w*",
+        "\\bno\\s+(unique\\s+)?[\\w-]+\\s+can\\s+be\\b",
+        "\\b(unidentifi|unobserv|unrecoverabl)\\w*",
+        "\\b(unavailable|not available|not identified|not observed|remains? unknown|unknown)\\b",
+        "\\b(no|without)\\s+(observed|independent|external|direct)\\s+[\\w-]+",
+        "\\b(non-unique|not unique|need not be unique|not uniquely)\\b",
+        "\\b(limitations?|caveats?)\\b",
+        [
+          "\\b(does not specify|not specified|unspecified|unclear)\\b",
+          0.5
+        ],
+        "\\bwithout\\s+(a|an|the|independent|additional|external)\\b.{0,40}\\b(data|information|total|evidence)\\b",
+        "无法",
+        "不可识别",
+        "不可观测",
+        "难以确定",
+        "局限",
+        "缺乏.{0,10}(数据|信息)",
+        "不唯一"
+      ]
+    },
+    "scope": {
+      "label": "范围限定",
+      "desc": "仅、只、示意性、条件性、在某假设下",
+      "weight": 0.5,
+      "patterns": [
+        "\\b(only|solely|merely)\\b",
+        [
+          "\\b(illustrative|hypothetical|stylized|indicative)\\b",
+          1.0
+        ],
+        "\\b(conditional|in-sample|reference)\\b",
+        "\\bunder\\s+(the|our|these|this)\\s+([\\w-]+\\s+){0,2}(assumptions?|scenarios?|rules?|interpretation)\\b",
+        "\\b(conditional|conditioned|conditions)\\s+on\\b",
+        "\\b(provided that|as long as|so long as)\\b",
+        "\\bwithin\\s+(the|this)\\s+(model|sample|scope)\\b",
+        "\\bassum(e|es|ed|ing|ption|ptions)\\b",
+        "仅",
+        "只",
+        "在.{0,15}假设下",
+        "有条件",
+        "示意性",
+        "样本内",
+        "前提是"
+      ]
+    },
+    "hedge": {
+      "label": "模糊限定",
+      "desc": "可能、或许、大致、表明",
+      "weight": 0.5,
+      "patterns": [
+        "\\b(may|might|could|possibly|perhaps|likely|unlikely|plausibl\\w*|approximately|roughly|suggests?|appears?|seems?)\\b",
+        "\\btends?\\s+to\\b",
+        "可能",
+        "或许",
+        "大致",
+        "大约",
+        "似乎",
+        "倾向于"
+      ]
+    }
+  }
+}

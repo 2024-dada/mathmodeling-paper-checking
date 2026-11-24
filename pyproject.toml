@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "papersim"
+version = "0.1.0"
+description = "论文重复率 + 防御性语言率检测，并生成专项 AI 优化提示词（面向数学建模竞赛）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = ["numpy", "scikit-learn", "pypdf"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+papersim = "papersim.cli:main"
+
+[tool.setuptools]
+packages = ["papersim"]
+
+[tool.setuptools.package-data]
+papersim = ["lexicon.json"]

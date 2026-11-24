@@ -1,0 +1,183 @@
+<!DOCTYPE html><html lang='zh'><head><meta charset='utf-8'><title>重复率与防御性语言率报告</title><style>
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;max-width:1120px;margin:32px auto;padding:0 20px;color:#1f1f1f;background:#fbfbf9;line-height:1.55}
+h1{font-size:26px;margin-bottom:4px}h2{margin-top:44px;border-bottom:2px solid #1f1f1f;padding-bottom:6px}
+.sub{color:#777;font-size:13px}.card{background:#fff;border:1px solid #e4e4df;border-radius:10px;padding:16px 20px;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{padding:7px 10px;border-bottom:1px solid #eee;text-align:left}
+th{background:#f4f4f0;font-weight:600}td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar{display:inline-block;height:9px;border-radius:5px;vertical-align:middle;margin-right:6px}
+.tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:9px;color:#fff;margin-right:4px}
+.sent{margin:7px 0;padding:6px 10px;border-left:3px solid #ddd;font-size:13.5px;background:#fdfdfb}
+mark{padding:0 1px;border-radius:2px}.fulltext{font-size:13px;max-height:520px;overflow:auto;white-space:pre-wrap}
+.legend span{margin-right:14px;font-size:12.5px}.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+details summary{cursor:pointer;font-weight:600;margin:8px 0}.pair{font-size:13px;margin:8px 0;padding:6px 10px;background:#fffaf0;border-radius:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style></head><body>
+<h1>重复率与防御性语言率报告</h1>
+<p class='sub'>2 篇被测论文 · 比对库 0 篇额外文献 · 排除 1 篇赛题原文 · 指纹长度 n=自动(英文8词/中文13字) · 防御阈值 1.0</p>
+<h2>总览</h2><div class='card'><table><tr><th>论文</th><th>总重复率</th><th>文字复制比</th><th>改写相似比</th><th>赛题引用</th><th>最相似来源</th><th>防御性语言率</th><th>摘要 / 正文</th><th>防御强度<br><span class='sub'>分/千词</span></th></tr>
+<tr><td><b>suspect</b><br><span class='sub'>189 词 · 14 句</span></td><td class='num'><span class="bar" style="width:120px;background:#d64834"></span><b>43.9%</b></td><td class='num'>24.9%</td><td class='num'>19.0%</td><td class='num'>4.8%</td><td>original<br><span class='sub'>43.9%</span></td><td class='num'><span class="bar" style="width:71px;background:#3a8fb7"></span><b>35.7%</b></td><td class='num'>50.0% / 30.0%</td><td class='num'>47.6</td></tr>
+<tr><td><b>original</b><br><span class='sub'>233 词 · 16 句</span></td><td class='num'><span class="bar" style="width:120px;background:#d64834"></span><b>33.9%</b></td><td class='num'>20.2%</td><td class='num'>13.7%</td><td class='num'>3.9%</td><td>suspect<br><span class='sub'>33.9%</span></td><td class='num'><span class="bar" style="width:2px;background:#3a8fb7"></span><b>0.0%</b></td><td class='num'>0.0% / 0.0%</td><td class='num'>0.0</td></tr>
+</table></div>
+<div class='card sub'><b>指标定义</b><br>
+总重复率 = 与比对库重复的词（中文为字）数 / 全文词数，包括逐字重复和改写相似两部分；与赛题原文相同的部分单列为"赛题引用"，不计入。<br>
+文字复制比：与任一来源连续 n 个词完全相同。改写相似比：句子级字符相似度 ≥ 阈值但不逐字相同（换词、调语序）。<br>
+防御性语言率 = 防御性句数 / 总句数。防御性句：命中的类别权重之和 ≥ 阈值。强类（否定式免责、对照纠偏、局限声明）权重 1，
+弱类（范围限定、模糊限定）权重 0.5，需两个弱类同时出现。防御强度 = 全部句子得分之和 / 千词。</div>
+<h2>防御性语言：类别分布</h2><div class='card'><table><tr><th>类别</th><th>suspect</th><th>original</th></tr>
+<tr><td><span class='tag' style='background:#e8604c'>否定式免责</span><span class='sub'>权重 1.0 · 声明结果“不是”什么：不是估计、不是预测、不应理解为……</span></td><td class='num'><span class="bar" style="width:34px;background:#e8604c"></span>14.3%</td><td class='num'><span class="bar" style="width:2px;background:#e8604c"></span>0.0%</td></tr>
+<tr><td><span class='tag' style='background:#d9822b'>对照纠偏</span><span class='sub'>权重 1.0 · 用“A 而非 B / 区分 A 与 B”主动划清边界</span></td><td class='num'><span class="bar" style="width:34px;background:#d9822b"></span>14.3%</td><td class='num'><span class="bar" style="width:2px;background:#d9822b"></span>0.0%</td></tr>
+<tr><td><span class='tag' style='background:#8e6bbf'>不可识别/局限声明</span><span class='sub'>权重 1.0 · 声明无法得到、无法识别、数据不可得、解不唯一</span></td><td class='num'><span class="bar" style="width:34px;background:#8e6bbf"></span>14.3%</td><td class='num'><span class="bar" style="width:2px;background:#8e6bbf"></span>0.0%</td></tr>
+<tr><td><span class='tag' style='background:#3a8fb7'>范围限定</span><span class='sub'>权重 0.5 · 仅、只、示意性、条件性、在某假设下</span></td><td class='num'><span class="bar" style="width:51px;background:#3a8fb7"></span>21.4%</td><td class='num'><span class="bar" style="width:2px;background:#3a8fb7"></span>0.0%</td></tr>
+<tr><td><span class='tag' style='background:#5aa469'>模糊限定</span><span class='sub'>权重 0.5 · 可能、或许、大致、表明</span></td><td class='num'><span class="bar" style="width:17px;background:#5aa469"></span>7.1%</td><td class='num'><span class="bar" style="width:2px;background:#5aa469"></span>0.0%</td></tr>
+</table><p class='sub'>数值为命中该类的句子占全部句子的比例，一句可同时命中多类。</p></div>
+<h2>逐篇明细</h2>
+<div class='card'><h3>suspect</h3>
+<details><summary>专项优化提示词（复制后连同论文全文发给 AI）</summary><button onclick="navigator.clipboard.writeText(this.nextElementSibling.value);this.textContent='已复制'">复制提示词</button><textarea readonly style='width:100%;height:320px;font-size:12.5px;margin-top:6px'># 论文专项优化提示词：suspect
+
+&gt; 使用方法：把整段提示词连同论文全文（或 LaTeX 源码）一起发给 AI。本提示词只列出问题句，请另外附上论文全文。
+
+## 角色与硬约束
+你是一名数学建模竞赛（MCM/ICM）的资深评委兼写作教练。请按下面的诊断结果修改这篇英文论文，输出语言与原文一致（英文）。
+必须遵守：
+1. **不改动任何数字、公式、模型设定和结论方向**；不新增论文里没有的数据、实验或文献。
+2. 需要新增分析才能支撑的地方，不要编造，写成 `[需补充分析：具体做什么]` 留给作者。
+3. 保留论文的 Report on Use of AI Tools（竞赛要求如实披露 AI 使用）。
+4. 不做同义词替换式的“降重”；每处修改都必须让论证更扎实或更有本队特色。
+
+## 一、底气：防御性语言优化
+诊断：全文防御性语言率 **35.7%**（摘要 50%，正文 30%），防御强度 47.6 分/千词。目标：摘要 ≤ 10%，正文 ≤ 8%。
+
+评委读到满篇“这不是预测”“仅为示意”“无法识别”时，会觉得作者对自己的结果没底气。改写原则：
+- 每个核心结论写成三步：**结论（带数字）→ 支撑证据（验证/对比/检验结果）→ 稳健性（扰动后是否仍成立）**。
+- 不确定性用数字表达（区间、误差、灵敏度），不用语气词表达。
+- 必要的局限集中写一次，并且每条都说明如何控制或缓解它。
+- 摘要只保留一句最关键的适用范围声明，其余位置给出具体发现。
+
+分类改写策略：
+- **对照纠偏**：“A 而非 B”只保留全文最关键的一处；其余改成直接陈述 A 及其证据。
+- **否定式免责**：遇到“这不是预测/估计”，改成正面陈述它**是什么**，并紧跟支撑它的验证数字。确实需要的边界声明，全文只在摘要留一句、在局限一节留一处。
+- **模糊限定**：may/likely/approximately 能量化就量化（区间、误差、弹性、扰动 ±x% 后结论是否改变），用检验结论替代“可能”。
+- **不可识别/局限声明**：合并到 Strengths and Weaknesses（或 Limitations）一节；每条局限都配一句“我们如何控制它”（灵敏度分析、区间界、替代数据、稳健性检验）。正文其他地方删掉重复声明。
+- **范围限定**：假设集中在 Assumptions 一节写清并给理由；结果处最多用一次“在基准假设下”，不要每句重复。
+
+需要处理的句子（按防御强度排序，最多 30 条）：
+
+| # | 位置 | 类别 | 原句 |
+|---|---|---|---|
+| 1 | 摘要 | 否定式免责、对照纠偏、范围限定 | These figures are illustrative scenarios rather than forecasts, and they should not be interpreted as engineering quotations. |
+| 2 | 正文第14句 | 否定式免责、范围限定 | This comparison is conditional on the baseline prices and does not imply that the mixed plan is optimal in practice. |
+| 3 | 摘要 | 不可识别/局限声明、模糊限定 | The true launch cadence in 2050 is unknown, so the schedule may change. |
+| 4 | 正文第8句 | 对照纠偏、范围限定 | We only consider transport cost, not construction cost or reliability. |
+| 5 | 正文第11句 | 不可识别/局限声明 | The cost parameters cannot be verified without independent industry data. |
+
+## 二、区分度：去同质化
+大家用同一个 AI 写同一道题，表述和段落结构会高度趋同。评委一天看几十篇，雷同的段落会直接被略过。
+诊断：总重复率 **43.9%**（逐字 24.9%，改写相似 19.0%）。最相似的来源：original（43.9%）
+
+改写原则：
+- **写出选择的理由**：为什么用这个模型、这个参数、这种数据处理方式，而不用常见做法。理由正是别人写不出来的部分。
+- **用本文独有的证据开头**：具体到某一季、某个对象、某个反常案例，不要用题目背景复述开头。
+- **重组结构**：问题驱动（先给答案，再说怎么得到），而不是千篇一律的“背景 → 方法 → 结果”。
+- **给模型和关键指标起本队的名字**，并在图表、结论中前后呼应。
+- 和赛题原文、公共数据描述相同的句子可以保留，但尽量压缩成一句。
+
+请先基于论文已有结果，提出 **3 个能让本文与众不同的切入角度**（每个一句话，标明依据的是文中哪个结果），再按这些角度改写下面的段落。
+
+逐字重复的片段：
+
+- 「The combined system finishes in 101 years, while the elevator alone needs 187 years」（与 original 相同）
+- 「Each harbor lifts cargo to an apex anchor, and rockets carry it onward to the Moon」（与 original 相同）
+- 「site. The minimum cut of this network bounds the annual throughput of the whole system」（与 original 相同）
+
+与其他论文高度相似的句子：
+
+| # | 本文 | 相似来源 | 来源原句 | 相似度 |
+|---|---|---|---|---|
+| 1 | In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site. | original | The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site. | 76% |
+| 2 | When no deadline is imposed the elevator chain is the cheapest choice. | original | The elevator chain is the cheapest option when no deadline is imposed. | 75% |
+
+## 三、输出格式
+1. 先给出 3 个差异化切入角度（如果有第二部分）。
+2. 再用表格逐条给出：`原句 | 修改后 | 修改理由（对应上面哪条原则）`。
+3. 最后给出改写后的**摘要全文**（这是评委最先读、也最影响印象的部分）。
+4. 列出所有 `[需补充分析：…]` 的位置，作为作者的待办清单。
+</textarea></details>
+<details><summary>重复内容高亮（全文）</summary><div class='legend'><span><i style='background:#f4b6ad'></i>逐字重复</span><span><i style='background:#f7dc9c'></i>改写相似</span><span><i style='background:#d9d9d4'></i>赛题原文</span></div><div class='fulltext'>Summary This paper studies how material can be shipped to a lunar base. <mark style="background:#f4b6ad" title="逐字重复 · original">The combined system finishes in 101 years, while the elevator alone needs 187 years</mark>. These figures are illustrative scenarios rather than forecasts, and they should not be interpreted as engineering quotations. The true launch cadence in 2050 is unknown, so the schedule may change. Keywords: lunar transport, network flow <mark style="background:#f4b6ad" title="逐字重复 · original">1 Introduction</mark> <mark style="background:#d9d9d4" title="赛题原文">The colony requires one hundred million tonnes of material</mark>. <mark style="background:#f4b6ad" title="逐字重复 · original">Each harbor lifts cargo to an apex anchor, and rockets carry it onward to the Moon</mark>. We only consider transport cost, not construction cost or reliability. 2 Model <mark style="background:#f7dc9c" title="改写相似">In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar</mark> <mark style="background:#f4b6ad" title="逐字重复 · original">site. The minimum cut of this network bounds the annual throughput of the whole system</mark>. The cost parameters cannot be verified without independent industry data. 3 Results <mark style="background:#f7dc9c" title="改写相似">When no deadline is imposed the elevator chain is the cheapest choice</mark>. The mixed system is fastest. This comparison is conditional on the baseline prices and does not imply that the mixed plan is optimal in practice.</div></details>
+<details><summary>按来源</summary><table><tr><td>original</td><td class='num'><span class="bar" style="width:120px;background:#d64834"></span>43.9%</td></tr></table></details>
+<details><summary>改写相似句（2）</summary><div class='pair'><b>76%</b> · 来源 original<br>本文：In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site.<br>来源：The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site.</div><div class='pair'><b>75%</b> · 来源 original<br>本文：When no deadline is imposed the elevator chain is the cheapest choice.<br>来源：The elevator chain is the cheapest option when no deadline is imposed.</div></details>
+<details open><summary>防御性句（5 / 14）</summary>
+<div class='sent'><span class='tag' style='background:#e8604c'>否定式免责</span><span class='tag' style='background:#d9822b'>对照纠偏</span><span class='tag' style='background:#3a8fb7'>范围限定</span><span class='sub'>摘要 · 第 3 句 · 得分 3</span><br>These figures are <mark style="background:#3a8fb733;border-bottom:2px solid #3a8fb7">illustrative</mark> scenarios <mark style="background:#d9822b33;border-bottom:2px solid #d9822b">rather than</mark> forecasts, and they <mark style="background:#e8604c33;border-bottom:2px solid #e8604c">should not be interpreted</mark> as engineering quotations.</div>
+<div class='sent'><span class='tag' style='background:#e8604c'>否定式免责</span><span class='tag' style='background:#3a8fb7'>范围限定</span><span class='sub'>正文 · 第 14 句 · 得分 2</span><br>This comparison is <mark style="background:#3a8fb733;border-bottom:2px solid #3a8fb7">conditional</mark> on the baseline prices and <mark style="background:#e8604c33;border-bottom:2px solid #e8604c">does not imply</mark> that the mixed plan is optimal in practice.</div>
+<div class='sent'><span class='tag' style='background:#8e6bbf'>不可识别/局限声明</span><span class='tag' style='background:#5aa469'>模糊限定</span><span class='sub'>摘要 · 第 4 句 · 得分 1.5</span><br>The true launch cadence in 2050 is <mark style="background:#8e6bbf33;border-bottom:2px solid #8e6bbf">unknown</mark>, so the schedule <mark style="background:#5aa46933;border-bottom:2px solid #5aa469">may</mark> change.</div>
+<div class='sent'><span class='tag' style='background:#d9822b'>对照纠偏</span><span class='tag' style='background:#3a8fb7'>范围限定</span><span class='sub'>正文 · 第 8 句 · 得分 1.5</span><br>We <mark style="background:#3a8fb733;border-bottom:2px solid #3a8fb7">only</mark> consider transport cost<mark style="background:#d9822b33;border-bottom:2px solid #d9822b">, not construction</mark> cost or reliability.</div>
+<div class='sent'><span class='tag' style='background:#8e6bbf'>不可识别/局限声明</span><span class='sub'>正文 · 第 11 句 · 得分 1</span><br>The cost parameters <mark style="background:#8e6bbf33;border-bottom:2px solid #8e6bbf">cannot be verified</mark> <mark style="background:#8e6bbf33;border-bottom:2px solid #8e6bbf">without independent industry</mark> data.</div>
+</details>
+</div>
+<div class='card'><h3>original</h3>
+<details><summary>专项优化提示词（复制后连同论文全文发给 AI）</summary><button onclick="navigator.clipboard.writeText(this.nextElementSibling.value);this.textContent='已复制'">复制提示词</button><textarea readonly style='width:100%;height:320px;font-size:12.5px;margin-top:6px'># 论文专项优化提示词：original
+
+&gt; 使用方法：把整段提示词连同论文全文（或 LaTeX 源码）一起发给 AI。本提示词只列出问题句，请另外附上论文全文。
+
+## 角色与硬约束
+你是一名数学建模竞赛（MCM/ICM）的资深评委兼写作教练。请按下面的诊断结果修改这篇英文论文，输出语言与原文一致（英文）。
+必须遵守：
+1. **不改动任何数字、公式、模型设定和结论方向**；不新增论文里没有的数据、实验或文献。
+2. 需要新增分析才能支撑的地方，不要编造，写成 `[需补充分析：具体做什么]` 留给作者。
+3. 保留论文的 Report on Use of AI Tools（竞赛要求如实披露 AI 使用）。
+4. 不做同义词替换式的“降重”；每处修改都必须让论证更扎实或更有本队特色。
+
+## 一、底气：防御性语言优化
+诊断：全文防御性语言率 **0.0%**（摘要 0%，正文 0%），防御强度 0.0 分/千词。目标：摘要 ≤ 10%，正文 ≤ 8%。
+
+评委读到满篇“这不是预测”“仅为示意”“无法识别”时，会觉得作者对自己的结果没底气。改写原则：
+- 每个核心结论写成三步：**结论（带数字）→ 支撑证据（验证/对比/检验结果）→ 稳健性（扰动后是否仍成立）**。
+- 不确定性用数字表达（区间、误差、灵敏度），不用语气词表达。
+- 必要的局限集中写一次，并且每条都说明如何控制或缓解它。
+- 摘要只保留一句最关键的适用范围声明，其余位置给出具体发现。
+
+分类改写策略：
+
+需要处理的句子（按防御强度排序，最多 30 条）：
+
+| # | 位置 | 类别 | 原句 |
+|---|---|---|---|
+
+## 二、区分度：去同质化
+大家用同一个 AI 写同一道题，表述和段落结构会高度趋同。评委一天看几十篇，雷同的段落会直接被略过。
+诊断：总重复率 **33.9%**（逐字 20.2%，改写相似 13.7%）。最相似的来源：suspect（33.9%）
+
+改写原则：
+- **写出选择的理由**：为什么用这个模型、这个参数、这种数据处理方式，而不用常见做法。理由正是别人写不出来的部分。
+- **用本文独有的证据开头**：具体到某一季、某个对象、某个反常案例，不要用题目背景复述开头。
+- **重组结构**：问题驱动（先给答案，再说怎么得到），而不是千篇一律的“背景 → 方法 → 结果”。
+- **给模型和关键指标起本队的名字**，并在图表、结论中前后呼应。
+- 和赛题原文、公共数据描述相同的句子可以保留，但尽量压缩成一句。
+
+请先基于论文已有结果，提出 **3 个能让本文与众不同的切入角度**（每个一句话，标明依据的是文中哪个结果），再按这些角度改写下面的段落。
+
+逐字重复的片段：
+
+- 「The combined system finishes in 101 years, while the elevator alone needs 187 years」（与 suspect 相同）
+- 「Each harbor lifts cargo to an apex anchor, and rockets carry it onward to the Moon」（与 suspect 相同）
+- 「site. The minimum cut of this network bounds the annual throughput of the whole system」（与 suspect 相同）
+
+与其他论文高度相似的句子：
+
+| # | 本文 | 相似来源 | 来源原句 | 相似度 |
+|---|---|---|---|---|
+| 1 | The elevator chain is the cheapest option when no deadline is imposed. | suspect | When no deadline is imposed the elevator chain is the cheapest choice. | 75% |
+| 2 | The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site. | suspect | In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site. | 74% |
+
+## 三、输出格式
+1. 先给出 3 个差异化切入角度（如果有第二部分）。
+2. 再用表格逐条给出：`原句 | 修改后 | 修改理由（对应上面哪条原则）`。
+3. 最后给出改写后的**摘要全文**（这是评委最先读、也最影响印象的部分）。
+4. 列出所有 `[需补充分析：…]` 的位置，作为作者的待办清单。
+</textarea></details>
+<details><summary>重复内容高亮（全文）</summary><div class='legend'><span><i style='background:#f4b6ad'></i>逐字重复</span><span><i style='background:#f7dc9c'></i>改写相似</span><span><i style='background:#d9d9d4'></i>赛题原文</span></div><div class='fulltext'>Summary We model the delivery of construction material to a lunar base using two transport modes. A maximum-flow network gives the annual capacity of each mode, and a mixed-integer program chooses the cheapest allocation for every deadline. <mark style="background:#f4b6ad" title="逐字重复 · suspect">The combined system finishes in 101 years, while the elevator alone needs 187 years</mark>. Higher launch cadence shortens the schedule but raises the variable cost sharply. Keywords: logistics, maximum flow, integer programming <mark style="background:#f4b6ad" title="逐字重复 · suspect">1 Introduction</mark> <mark style="background:#d9d9d4" title="赛题原文">The colony requires one hundred million tonnes of material</mark>. <mark style="background:#f4b6ad" title="逐字重复 · suspect">Each harbor lifts cargo to an apex anchor, and rockets carry it onward to the Moon</mark>. Ground rockets launch directly from ten sites around the world. We compare the completion time and the transport cost of three delivery plans. 2 Model <mark style="background:#f7dc9c" title="改写相似">The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site</mark>. Edge capacities encode the annual lift limit of each harbor and the launch limit of each <mark style="background:#f4b6ad" title="逐字重复 · suspect">site. The minimum cut of this network bounds the annual throughput of the whole system</mark>. We then fix a deadline and minimize the total transport cost subject to the capacity constraints. 3 Results <mark style="background:#f7dc9c" title="改写相似">The elevator chain is the cheapest option when no deadline is imposed</mark>. The mixed system is the fastest option and costs about forty-two trillion dollars. Rockets alone are both slower than the mixed system and more expensive than the elevator.</div></details>
+<details><summary>按来源</summary><table><tr><td>suspect</td><td class='num'><span class="bar" style="width:120px;background:#d64834"></span>33.9%</td></tr></table></details>
+<details><summary>改写相似句（2）</summary><div class='pair'><b>75%</b> · 来源 suspect<br>本文：The elevator chain is the cheapest option when no deadline is imposed.<br>来源：When no deadline is imposed the elevator chain is the cheapest choice.</div><div class='pair'><b>74%</b> · 来源 suspect<br>本文：The source node represents the material pool on Earth and the sink node represents completed delivery at the lunar site.<br>来源：In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site.</div></details>
+<details open><summary>防御性句（0 / 16）</summary>
+</details>
+</div>
+<p class='sub'>由 papersim 生成。词典可在 papersim/lexicon.json 中修改。</p></body></html>

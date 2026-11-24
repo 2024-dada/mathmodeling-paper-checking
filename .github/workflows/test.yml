@@ -1,0 +1,17 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: sudo apt-get install -y poppler-utils
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - run: papersim examples/suspect.txt examples/original.txt -x examples/problem.txt -o demo.html

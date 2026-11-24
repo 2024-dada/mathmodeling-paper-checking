@@ -1,0 +1,14 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.venv/
+.env
+# 本地检测结果与真实论文不入库
+samples/
+papers/
+*.pdf
+papersim_report.html
+prompts/
+!examples/prompts/

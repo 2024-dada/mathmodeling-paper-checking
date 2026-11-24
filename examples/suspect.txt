@@ -1,0 +1,12 @@
+Summary
+This paper studies how material can be shipped to a lunar base. The combined system finishes in 101 years, while the elevator alone needs 187 years. These figures are illustrative scenarios rather than forecasts, and they should not be interpreted as engineering quotations. The true launch cadence in 2050 is unknown, so the schedule may change.
+Keywords: lunar transport, network flow
+
+1 Introduction
+The colony requires one hundred million tonnes of material. Each harbor lifts cargo to an apex anchor, and rockets carry it onward to the Moon. We only consider transport cost, not construction cost or reliability.
+
+2 Model
+In the network, the source node stands for the material pool on Earth while the sink node stands for finished delivery at the lunar site. The minimum cut of this network bounds the annual throughput of the whole system. The cost parameters cannot be verified without independent industry data.
+
+3 Results
+When no deadline is imposed the elevator chain is the cheapest choice. The mixed system is fastest. This comparison is conditional on the baseline prices and does not imply that the mixed plan is optimal in practice.
