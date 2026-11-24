@@ -283,6 +283,18 @@ chat.disable(); embed.disable(); syncOpts();
 /* ---------------- 运行 ---------------- */
 $("#run").onclick = async () => {
   const btn = $("#run"), log = $("#log");
+  last = null;
+  $("#runSummary").innerHTML = '<h3>检测进行中</h3><p>本次完成后更新参数与结果。</p>';
+  $("#papers").innerHTML = "";
+  const settings = { mode: mode || "全部", level, threshold: +$("#para").value,
+    embedText: $("#embedText").checked, model: chat.value || "未使用",
+    review: $("#oReview").checked && !$("#oReview").disabled,
+    semantic: $("#oEmbed").checked && !$("#oEmbed").disabled,
+    apply: $("#oApply").checked && !$("#oApply").disabled,
+    corpus: files.corpus.length, exclude: files.exclude.length };
+  const configuredClient = client();
+  costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
+  $("#costV").textContent = "—"; $("#costS").textContent = "本次尚未产生 API 消耗";
   btn.dataset.busy = "1"; btn.disabled = true; $("#spin").style.display = "block"; log.style.color = "";
   const say = async m => { log.textContent = m; await tick(); };
   try {
@@ -297,22 +309,22 @@ $("#run").onclick = async () => {
       catch (e) { throw new Error(`读取 ${f.name} 失败：${e.message}`); }
     }
     for (const d of got.papers) if (d.sentences.length < 3) toast(`${d.name} 几乎没抽出文字，可能是扫描版 PDF`);
-    const useLLM = chat.value && ($("#oReview").checked || $("#oApply").checked || (embed.value && $("#oEmbed").checked));
+    const useLLM = configuredClient && (settings.review || settings.apply || settings.semantic);
     let before = null;
     if (useLLM) {
-      costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
+      costByBalance = null;
       $("#costV").textContent = "…"; $("#costS").textContent = "运行中，实时统计";
       before = await refreshBalance(true);
     }
     const res = await E.run({
-      docs: got.papers, corpus: got.corpus, exclude: got.exclude, lex, client: useLLM ? client() : null, log: say,
+      docs: got.papers, corpus: got.corpus, exclude: got.exclude, lex, client: useLLM ? configuredClient : null, log: say,
       opt: {
-        only: mode || null, paraThreshold: +$("#para").value, level,
-        embedText: $("#embedText").checked, llmReview: $("#oReview").checked && !$("#oReview").disabled,
-        llmEmbed: $("#oEmbed").checked && !$("#oEmbed").disabled, apply: $("#oApply").checked && !$("#oApply").disabled,
+        only: settings.mode === "全部" ? null : settings.mode, paraThreshold: settings.threshold, level: settings.level,
+        embedText: settings.embedText, llmReview: settings.review,
+        llmEmbed: settings.semantic, apply: settings.apply,
       }
     });
-    last = { ...res, lex, targets: [E.LEVELS[level - 1].summary, E.LEVELS[level - 1].body] };
+    last = { ...res, settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
     if (useLLM && before) {
       await say("更新余额…"); await new Promise(r => setTimeout(r, 1500));
       const after = await refreshBalance(true);
@@ -325,7 +337,7 @@ $("#run").onclick = async () => {
     }
     showResults(last);
     log.textContent = "完成";
-  } catch (e) { log.textContent = "出错：" + e.message; log.style.color = "var(--dup)"; console.error(e); }
+  } catch (e) { $("#runSummary").textContent = "本次检测未完成：" + e.message; log.textContent = "出错：" + e.message; log.style.color = "var(--dup)"; console.error(e); }
   btn.dataset.busy = ""; $("#spin").style.display = "none"; render();
   if (last) $("#log").textContent = "完成";
 };
@@ -368,6 +380,8 @@ function paperCard(r, k) {
   return `<section class="card paper" data-k="${k}">
     <h3>${esc(doc.name)}</h3><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
     <div class="metrics">${dupBox}${defBox}</div>
+    ${stylePanel(r.style[k])}
+    <div class="recommendations"><h4>修改建议</h4><ul>${advice(r, k).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
     <div class="tabs">${tabs.map(([id, t], i) => `<button data-t="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div>
     <div class="pane on" data-p="prompt"><div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
     ${sg ? `<div class="pane" data-p="sug"><div class="acts"><button class="btn sm cps">复制</button></div><div class="md">${esc(sg)}</div></div>` : ""}
@@ -377,14 +391,44 @@ function paperCard(r, k) {
       <div class="pane" data-p="full"><div class="legend"><span><i style="background:rgba(255,60,142,.6)"></i>逐字重复</span><span><i style="background:rgba(255,176,0,.55)"></i>改写相似</span><span><i style="background:rgba(143,92,255,.5)"></i>赛题原文</span></div><div class="fulltext">${highlightDup(doc.text, d.spans)}</div></div>` : ""}
   </section>`;
 }
+function advice(r, k) {
+  const a = [], d = r.dup[k], f = r.dfn[k], s = r.style[k];
+  if (d?.total > 0) a.push("优先核对下方重复高亮与来源，为引用补充标注，并用自己的论证说明模型选择。");
+  if (f?.summary > r.targets[0]) a.push("摘要防御率超过本次目标：逐句检查免责和限定表达，用可验证的结果支撑结论。");
+  if (f?.body > r.targets[1]) a.push("正文防御率超过本次目标：保留必要假设，将重复的局限说明集中整理。");
+  if (s.hits.length) a.push(`有 ${s.hits.length} 句命中模板表达，结合下方原句替换为空泛措辞所指的具体事实。`);
+  if (!a.length) a.push("当前规则未提示优先修改项，请继续人工核对数据、引用、模型假设和结论。");
+  a.push("AI / GPT 写作来源尚不可判定；如需记录真实使用情况，请依据写作过程和版本记录整理 AI 使用报告。");
+  return a;
+}
+function stylePanel(s) {
+  return `<section class="style-review"><h4>AI 写作特征观察</h4><div class="metrics">
+    <div class="metric"><div class="lab">模板化表达句占比</div><div class="big">${pct(s.rate)}</div><div class="hint">${s.hits.length} / ${s.total} 句 · 规则命中比例</div></div>
+    <div class="metric"><div class="lab">AI 生成率</div><div class="unknown">尚不可判定</div><div class="hint">未接入经过验证的来源检测服务</div></div>
+    <div class="metric"><div class="lab">GPT 写作率</div><div class="unknown">尚不可判定</div><div class="hint">无法仅凭风格确定具体生成模型</div></div></div>
+    <p class="hint">${esc(s.note)} 学术惯用语也可能命中；0% 也不代表人工写作。</p>
+    ${s.hits.length ? `<details><summary>查看 ${s.hits.length} 句命中依据</summary>${s.hits.map(h => `<div class="sent"><div class="t">第 ${h.index + 1} 句 · ${h.signals.map(esc).join(" / ")}</div>${esc(h.text)}</div>`).join("")}</details>` : ""}</section>`;
+}
+function summaryPanel(r) {
+  const s = r.settings;
+  return `<h3>本次检测参数</h3><dl class="summary-grid">${Object.entries({
+    "被测论文": r.docs.length + " 篇", "比对库": s.corpus + " 篇", "赛题原文": s.exclude + " 篇",
+    "检测内容": ({dup:"重复率",def:"防御性语言"})[s.mode] || "全部", "防御率挡位": s.level,
+    "摘要 / 正文目标": r.targets.map(x => pct(x,0)).join(" / "), "改写相似阈值": s.threshold,
+    "提示词附全文": s.embedText ? "是" : "否", "对话模型": s.model,
+    "防御句复核": s.review ? "开启" : "关闭", "语义检测": s.semantic ? "开启" : "关闭",
+    "模型修改建议": s.apply ? "开启" : "关闭", "风格检测方法": "本地词典 · template-lexicon-v1"
+  }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
+}
 function showResults(r) {
   $("#results").style.display = "block";
+  $("#runSummary").innerHTML = summaryPanel(r);
   $("#papers").innerHTML = r.docs.map((_, k) => paperCard(r, k)).join("");
   document.querySelectorAll(".paper").forEach(card => {
     const k = +card.dataset.k;
     card.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
       card.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
-      card.querySelectorAll(".pane").forEach(x => x.classList.toggle("on", x.dataset.p === b.dataset.t));
+      card.querySelector(`[data-p="${b.dataset.t}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     card.querySelector(".cp").onclick = () => copy(r.prompts[k]);
     card.querySelector(".cps")?.addEventListener("click", () => copy(r.suggestions[k]));
@@ -407,23 +451,23 @@ $("#dlPrompts").onclick = () => last && download(`papersim_提示词_${stamp()}.
 $("#dlCsv").onclick = () => {
   if (!last) return;
   const f4 = x => x == null ? "" : x.toFixed(4);
-  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率"]];
+  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "模板化表达句占比", "AI生成率状态", "GPT写作率状态"]];
   last.docs.forEach((d, i) => {
     const u = last.dup[i], f = last.dfn[i], top = u ? Object.entries(u.bySource)[0] || ["", 0] : ["", null];
     rows.push([d.name, d.nWords, d.sentences.length, f4(u?.total), f4(u?.exact), f4(u?.paraphrase), f4(u?.excluded), top[0], f4(top[1]),
-      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate)]);
+      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), f4(last.style[i].rate), "尚不可判定", "尚不可判定"]);
   });
   download(`papersim_${stamp()}.csv`, "﻿" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 };
 $("#dlJson").onclick = () => {
   if (!last) return;
-  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], prompt: last.prompts[i], suggestion: last.suggestions[i] }));
+  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], style: last.style[i], settings: last.settings, advice: advice(last, i), prompt: last.prompts[i], suggestion: last.suggestions[i] }));
   download(`papersim_${stamp()}.json`, JSON.stringify(out, null, 1), "application/json");
 };
 $("#dlReport").onclick = () => {
   if (!last) return;
   const css = [...document.styleSheets].map(s => { try { return [...s.cssRules].map(r => r.cssText).join("\n"); } catch (e) { return ""; } }).join("\n");
-  const body = last.docs.map((_, k) => paperCard(last, k)).join("");
+  const body = summaryPanel(last) + last.docs.map((_, k) => paperCard(last, k)).join("");
   const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>papersim 报告</title><style>${css}
     .pane{display:block!important;margin-bottom:16px}.tabs{display:none}textarea.prompt{height:auto;min-height:300px}.fulltext,.md{max-height:none}</style></head>
     <body><div class="wrap"><header><h1>papersim 报告</h1><span class="sub">${new Date().toLocaleString()}</span></header>${body}</div></body></html>`;

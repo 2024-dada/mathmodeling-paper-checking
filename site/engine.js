@@ -340,6 +340,15 @@ const AI_TEMPLATE = [
   /\b(auditable|traceable|reproducible witness)\b/i, /\breconstruction consistency\b/i,
   /值得注意的是/, /综上所述/, /具有重要(的)?意义/, /起着?至关重要的作用/, /深入探讨/, /全面(地)?(分析|探讨)/,
 ];
+export function analyzeStyle(doc) {
+  const hits = doc.sentences.flatMap((text, index) => {
+    const signals = [...new Set(AI_TEMPLATE.map(r => text.match(r)?.[0]).filter(Boolean))];
+    return signals.length ? [{ index, text, signals }] : [];
+  });
+  return { method: "template-lexicon-v1", rate: doc.sentences.length ? hits.length / doc.sentences.length : null,
+    total: doc.sentences.length, hits, aiRate: null, gptRate: null,
+    note: "模板特征只能提示表达习惯，不能证明文本由 AI 或 GPT 生成。" };
+}
 const STRATEGY = {
   disclaimer: "遇到“这不是预测/估计”，改成正面陈述它**是什么**，并紧跟支撑它的验证数字。确实需要的边界声明，全文只在摘要留一句、在局限一节留一处。",
   contrast: "“A 而非 B”只保留全文最关键的一处；其余改成直接陈述 A 及其证据。",
@@ -628,5 +637,5 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
     } else suggestions.push(null);
   }
   log("完成");
-  return { docs, dup, dfn, prompts, suggestions };
+  return { docs, dup, dfn, prompts, suggestions, style: docs.map(analyzeStyle) };
 }

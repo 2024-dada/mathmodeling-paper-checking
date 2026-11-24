@@ -227,9 +227,10 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 .toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<link rel="stylesheet" href="studio.css">
 </head>
 <body>
-<canvas id="city" aria-hidden="true"></canvas>
+<div class="cityscape" aria-hidden="true"></div>
 <div class="veil"></div>
 <div class="overlay" id="overlay">松开即可加入被测论文</div>
 <div class="toast" id="toast" role="status"></div>
@@ -239,9 +240,16 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
     <span class="tagline">数模论文自查：<b>重复率</b>、<b>防御性语言率</b>，并生成专项优化提示词</span>
     <a class="gh" href="https://github.com/2024-dada/mathmodeling-paper-checking" target="_blank" rel="noopener">GitHub</a>
   </header>
+  <section class="hero">
+    <div class="eyebrow">PAPERSIM / WRITING OBSERVATORY</div>
+    <h2>让论证清晰。<br><em>让表达有据。</em></h2>
+    <p>从重复片段到防御性语言，把需要修改的地方看清楚。<br>放入论文，在同一份结果里查看指标、依据与建议。</p>
+    <div class="hero-actions"><a class="btn primary" href="#upload">开始自查 ↘</a><a class="btn" href="#results">前往结果区 ↓</a></div>
+    <div class="hero-caption">01 / 本地解析　　02 / 可追溯指标　　03 / 集中报告</div>
+  </section>
   <div class="notice" id="notice">论文只在你的浏览器里解析和计算，不会上传到任何服务器。用大模型时，key 和句子由浏览器直接发给你选的服务商。</div>
 
-  <section class="card">
+  <section class="card" id="upload">
     <h2><span class="n">1</span>放入论文</h2>
     <p class="desc">拖入文件或文件夹，也可以点击选择。支持 PDF、TXT、MD、TEX。多篇被测论文会互相比对。</p>
     <div class="zones">
@@ -299,11 +307,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
         </div>
         <div class="errbox" id="err"></div>
 
-        <div class="meter" id="meter">
-          <div><div class="k">账户余额<button class="rf" id="balRf" title="刷新余额">刷新</button></div><div class="v money" id="balV">—</div><div class="s" id="balS">填好 key 后自动查询</div></div>
-          <div><div class="k">本次消耗</div><div class="v money" id="costV">—</div><div class="s" id="costS">开始检测后实时统计</div></div>
-          <div class="full"><div class="k">本次用量</div><div class="s" id="useS" style="font-family:var(--mono);color:var(--ink2)">0 次调用 · 输入 0 · 输出 0 tokens</div></div>
-        </div>
+
 
         <label class="check" style="margin-top:12px"><input type="checkbox" id="remember"><span>记住 key<small>只保存在这台电脑的浏览器里</small></span></label>
         <details class="adv" id="adv">
@@ -343,9 +347,9 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
     <div class="log" id="log" role="status">先放入至少一篇被测论文</div>
   </div>
 
-  <section id="results">
+  <section id="results" aria-label="综合检测结果">
     <div class="rhead">
-      <h2>检测结果</h2>
+      <h2>04 / 综合结果</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn sm" id="dlReport">下载报告（HTML）</button>
         <button class="btn sm" id="dlPrompts">下载全部提示词</button>
@@ -353,16 +357,24 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
         <button class="btn sm" id="dlJson">下载 JSON</button>
       </div>
     </div>
+    <p class="desc">本次参数、检测指标、账户统计与修改建议集中在这里。</p>
+    <div class="card" id="runSummary"><h3>等待检测</h3><p class="desc">选择论文并开始检测后，将显示本次参数与汇总结果。</p></div>
+    <div class="card"><h3>账户与本次消耗</h3>        <div class="meter" id="meter">
+          <div><div class="k">账户余额<button class="rf" id="balRf" title="刷新余额">刷新</button></div><div class="v money" id="balV">—</div><div class="s" id="balS">填好 key 后自动查询</div></div>
+          <div><div class="k">本次消耗</div><div class="v money" id="costV">—</div><div class="s" id="costS">开始检测后实时统计</div></div>
+          <div class="full"><div class="k">本次用量</div><div class="s" id="useS" style="font-family:var(--mono);color:var(--ink2)">0 次调用 · 输入 0 · 输出 0 tokens</div></div>
+        </div></div>
     <div id="papers"></div>
   </section>
 
   <footer>
+    <p><b>AI 来源评估。</b>模板化表达句占比 = 命中特征词的句数 / 总句数，只用于定位写作习惯。AI 生成率与 GPT 写作率无法从这些规则中推算；当前未接入经过验证的来源检测服务，不输出虚构百分比。</p>
     <p><b>指标说明。</b>总重复率是与比对库逐字重复（连续 8 个英文词或 13 个汉字）和改写相似（句子相似度不低于阈值）的词数占全文的比例；与赛题原文相同的部分单列，不计入。防御性语言率是防御性句数占总句数的比例：按否定式免责、对照纠偏、局限声明、范围限定、模糊限定 5 类打分，总分不低于 1 的句子算防御性句。</p>
     <p><b>服务商不允许网页直接调用时</b>，页面会提示“浏览器无法访问”。可以换一家服务商、填写支持跨域的中转地址，或者用本地版：<code>pip install -e .</code> 后运行 <code>papersim-web</code>，界面相同，API 请求经本机转发。</p>
     <p>本工具用于自查和改进写作。竞赛要求如实披露 AI 使用，请在论文的 AI 使用报告中说明。</p>
   </footer>
 </div>
-<script type="module" src="city.js"></script>
+
 <script type="module" src="app.js"></script>
 </body>
 </html>
