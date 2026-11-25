@@ -4,6 +4,7 @@ import { reportPdf } from "./reportpdf.js";
 import { docxToText } from "./docxtext.js";
 
 const $ = s => document.querySelector(s);
+const scrollMode = () => document.documentElement.dataset.motion === "reduce" || matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d) + "%";
 const ALLOWED = /\.(pdf|docx|txt|md|tex)$/i;
@@ -43,7 +44,7 @@ function lockDetection(lock) {
     document.querySelectorAll(".combo .pop").forEach(el => el.classList.remove("open"));
     $("#overlay").classList.remove("on");
     setProgress(0, "正在准备检测…");
-    $("#runProgress").scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#runProgress").scrollIntoView({ behavior: scrollMode(), block: "center" });
   } else syncOpts();
 }
 // inert 阻止键盘和点击进入设置区；捕获点击时给出明确提示。
@@ -516,7 +517,7 @@ function showResults(r) {
     const k = +card.dataset.k;
     card.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
       card.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
-      card.querySelector(`[data-p="${b.dataset.t}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      card.querySelector(`[data-p="${b.dataset.t}"]`)?.scrollIntoView({ behavior: scrollMode(), block: "start" });
     });
     card.querySelector(".cp").onclick = () => copy(r.prompts[k]);
     card.querySelector(".cps")?.addEventListener("click", () => copy(r.suggestions[k]));
@@ -524,7 +525,7 @@ function showResults(r) {
     card.querySelector(".revised-download")?.addEventListener("click", () => download(`${r.docs[k].name}_修订正文.txt`, r.docs[k].text, "text/plain"));
     card.querySelector(".dl").onclick = () => download(`${r.docs[k].name}_优化提示词.md`, r.prompts[k], "text/markdown");
   });
-  $("#results").scrollIntoView({ behavior: "smooth" });
+  $("#results").scrollIntoView({ behavior: scrollMode() });
 }
 async function copy(t) {
   try { await navigator.clipboard.writeText(t); }
@@ -559,7 +560,7 @@ $("#dlReport").onclick = () => {
   const css = [...document.styleSheets].map(s => { try { return [...s.cssRules].map(r => r.cssText).join("\n"); } catch (e) { return ""; } }).join("\n");
   const body = summaryPanel(last) + `<section class="card"><h3>账户与用量</h3><pre>${esc(last.accountText)}</pre></section>` + last.docs.map((_, k) => paperCard(last, k)).join("");
   const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>papersim 报告</title><style>${css}
-    .pane{display:block!important;margin-bottom:16px}.tabs{display:none}textarea.prompt{height:auto;min-height:300px}.fulltext,.md{max-height:none}</style></head>
+    .wrap{margin:0 auto!important;max-width:1200px}.pane{display:block!important;margin-bottom:16px}.tabs{display:none}textarea.prompt{height:auto;min-height:300px}.fulltext,.md{max-height:none}</style></head>
     <body><div class="wrap"><header><h1>papersim 报告</h1><span class="sub">${new Date().toLocaleString()}</span></header>${body}</div></body></html>`;
   download(`papersim_报告_${stamp()}.html`, html, "text/html");
 };
