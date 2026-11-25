@@ -227,7 +227,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 .toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<link rel="stylesheet" href="studio.css?v=progress1">
+<link rel="stylesheet" href="studio.css?v=conversation1">
 </head>
 <body>
 <div class="cityscape" aria-hidden="true"></div>
@@ -370,15 +370,14 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
     <div class="card" id="runSummary"><h3>等待检测</h3><p class="desc">选择论文并开始检测后，将显示本次参数与汇总结果。</p></div>
     <div class="card"><h3>账户与本次消耗</h3>        <div class="meter" id="meter">
           <div><div class="k">账户余额<button class="rf" id="balRf" title="刷新余额">刷新</button></div><div class="v money" id="balV">—</div><div class="s" id="balS">填好 key 后自动查询</div></div>
-          <div><div class="k">本次消耗</div><div class="v money" id="costV">—</div><div class="s" id="costS">开始检测后实时统计</div></div>
-          <div class="full"><div class="k">本次用量</div><div class="s" id="useS" style="font-family:var(--mono);color:var(--ink2)">0 次调用 · 输入 0 · 输出 0 tokens</div></div>
+          <div><div class="k">当前账户累计消耗</div><div class="v money" id="costV">—</div><div class="s" id="costS">开始检测后实时统计</div></div>
+          <div class="full"><div class="k">本次检测与续聊累计用量</div><div class="s" id="useS" style="font-family:var(--mono);color:var(--ink2)">0 次调用 · 输入 0 · 输出 0 tokens</div></div>
         </div></div>
     <div id="papers"></div>
     <div class="pdf-download"><div><h3>把结果带走</h3><p>本次参数、全部指标、判定依据、修改建议和优化提示词，合并为一份 PDF。浏览器本地生成，直接下载。</p></div><button class="btn primary" id="dlPdf" disabled>一键下载 PDF 报告 ↓</button></div>
   </section>
 
   <footer>
-    <p><b>AI 来源评估。</b>模板化表达句占比 = 命中特征词的句数 / 总句数，只用于定位写作习惯。AI 生成率与 GPT 写作率无法从这些规则中推算；当前未接入经过验证的来源检测服务，不输出虚构百分比。</p>
     <p><b>指标说明。</b>总重复率是与比对库逐字重复（连续 8 个英文词或 13 个汉字）和改写相似（句子相似度不低于阈值）的词数占全文的比例；与赛题原文相同的部分单列，不计入。防御性语言率是防御性句数占总句数的比例：按否定式免责、对照纠偏、局限声明、范围限定、模糊限定 5 类打分，总分不低于 1 的句子算防御性句。</p>
     <p><b>服务商不允许网页直接调用时</b>，页面会提示“浏览器无法访问”。可以换一家服务商、填写支持跨域的中转地址，或者用本地版：<code>pip install -e .</code> 后运行 <code>papersim-web</code>，界面相同，API 请求经本机转发。</p>
     <p>本工具用于自查和改进写作。竞赛要求如实披露 AI 使用，请在论文的 AI 使用报告中说明。</p>

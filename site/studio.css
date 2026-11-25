@@ -44,3 +44,5 @@ footer{max-width:none;margin-top:40px;background:rgba(16,23,40,.88);padding:22px
 #progressDetail{margin:12px 0 6px;overflow-wrap:anywhere}.run-progress small{color:var(--ink3)}.run-progress.failed{border-color:var(--magenta)}
 .detecting #analysisInputs,.detecting #results{opacity:.65}.detecting .run-progress{position:sticky;bottom:16px;z-index:20;box-shadow:0 10px 40px #0008}.detecting #progressFill{background-size:200% 100%;animation:progress-glow 2s linear infinite}
 @keyframes progress-glow{50%{filter:brightness(1.25)}}
+
+.followup{margin-top:28px;padding:22px;border:1px solid var(--line2);border-radius:10px;background:#101e30}.followup h4{margin:0 0 10px;font-size:18px}.followup-input{display:block;width:100%;margin:10px 0 16px;padding:12px;color:var(--ink);background:#091422;border:1px solid var(--line);font:inherit;resize:vertical}.followup-status{color:var(--magenta);overflow-wrap:anywhere}.revision{color:var(--cyan);font-size:12px;margin-bottom:12px}.revised{margin:22px 0}.revised summary{cursor:pointer;margin-bottom:12px}

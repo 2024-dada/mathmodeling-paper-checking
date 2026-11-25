@@ -219,25 +219,33 @@ function syncOpts() {
 $("#oEmbed").onchange = e => e.target._touched = true;
 
 /* ---------------- 余额与消耗 ---------------- */
-let provider = null, balance = null, balBusy = false, lastBalAt = 0;
+let provider = null, balance = null, balBusy = false, lastBalAt = 0, balancePromise = null;
+let billingTimers = [], billingGeneration = 0, billingOwner = "";
+const billingIdentity = () => `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`;
 const SYM = { CNY: "¥", USD: "$" };
 const money = (x, cur) => x == null || isNaN(x) ? "—" : `${SYM[cur] || ""}${Math.abs(x) < 1 ? x.toFixed(4) : x.toFixed(2)}`;
 async function refreshBalance(quiet = false) {
   const key = $("#key").value.trim();
   if (!key || !provider) { $("#balV").textContent = "—"; $("#balS").textContent = "填好 key 后自动查询"; return null; }
   if (!E.balanceSupported(provider)) { $("#balV").textContent = "—"; $("#balS").textContent = "该服务商没有公开的余额查询接口，请在官网控制台查看"; return null; }
-  if (balBusy) return balance;
+  if (balancePromise) { await balancePromise; return refreshBalance(quiet); }
   balBusy = true; if (!quiet) $("#balS").textContent = "查询中…";
-  const r = await E.getBalance(provider, $("#base").value.trim(), key);
+  const account = `${provider}|${$("#base").value.trim()}|${key}`;
+  let r;
+  try {
+    balancePromise = E.getBalance(provider, $("#base").value.trim(), key);
+    r = await balancePromise;
+  } finally { balancePromise = null; balBusy = false; }
+  if (account !== `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`) return null;
   balBusy = false; lastBalAt = Date.now();
   if (r.ok) {
     balance = r;
     $("#balV").textContent = r.amount != null ? money(r.amount, r.currency) : `已用 ${money(r.used, r.currency)}`;
     $("#balS").textContent = `${r.detail} · ${new Date(r.at).toLocaleTimeString()}`;
-    return r;
+    snapshotAccount(); return r;
   }
   $("#balV").textContent = "—"; $("#balS").textContent = r.reason + (!E.net.proxied && /浏览器/.test(r.reason) ? "（本地版可查）" : "");
-  return null;
+  snapshotAccount(); return null;
 }
 $("#balRf").onclick = () => refreshBalance();
 
@@ -264,7 +272,30 @@ function showUsage(u) {
   if (costByBalance) { $("#costV").textContent = money(costByBalance.amount, costByBalance.currency); $("#costS").textContent = "按运行前后的余额差计算" + (est != null ? ` · 按单价估算 ${money(est, cur)}` : ""); }
   else if (est != null) { $("#costV").textContent = "≈ " + money(est, cur); $("#costS").textContent = "按你填的单价估算"; }
   else if (u.calls) { $("#costV").textContent = "—"; $("#costS").textContent = "在“服务商、地址与单价”里填写单价即可估算金额"; }
-  if (u.calls && Date.now() - lastBalAt > 8000 && balance) refreshBalance(true);   // 运行中顺带刷新余额
+  snapshotAccount();
+  if (detecting && u.calls && Date.now() - lastBalAt > 8000 && balance) refreshBalance(true);   // 运行中顺带刷新余额
+}
+
+function snapshotAccount() {
+  if (last) { last.accountText = $("#meter").innerText; last.usage = { ...usage }; }
+}
+function stopBillingPolls() { billingGeneration++; billingTimers.forEach(clearTimeout); billingTimers = []; }
+async function settleBilling(before, previousCost, generation) {
+  const account = `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`;
+  const update = async () => {
+    if (generation !== billingGeneration || account !== `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`) return;
+    const after = await refreshBalance(true);
+    if (generation !== billingGeneration) return;
+    if (before && after && before.currency === after.currency) {
+      const delta = before.amount != null && after.amount != null ? before.amount - after.amount : after.used != null && before.used != null ? after.used - before.used : null;
+      if (delta != null && delta >= 0) {
+        costByBalance = { amount: delta + (previousCost?.currency === after.currency ? previousCost.amount : 0), currency: after.currency };
+      }
+    }
+    showUsage(usage); snapshotAccount();
+  };
+  await update();
+  if (E.balanceSupported(provider)) for (const delay of [2000, 5000, 10000]) billingTimers.push(setTimeout(() => update().catch(e => { $("#balS").textContent = "自动更新余额失败：" + e.message; snapshotAccount(); }), delay));
 }
 
 /* ---------------- API 识别 ---------------- */
@@ -331,6 +362,7 @@ chat.disable(); embed.disable(); syncOpts();
 $("#run").onclick = async () => {
   if (blocked() || !files.papers.length) return;
   const btn = $("#run"), log = $("#log");
+  stopBillingPolls(); billingOwner = billingIdentity();
   last = null;
   $("#dlPdf").disabled = true;
   $("#runSummary").innerHTML = '<h3>检测进行中</h3><p>本次完成后更新参数与结果。</p>';
@@ -345,7 +377,7 @@ $("#run").onclick = async () => {
   costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
   $("#costV").textContent = "—"; $("#costS").textContent = "本次尚未产生 API 消耗";
   log.style.color = "";
-  let completed = false, failure = null;
+  let completed = false, failure = null, before = null, useLLM = false;
   lockDetection(true);
   const say = async m => { log.textContent = "检测中 · " + m; setProgress(progressValue, m); await tick(); };
   try {
@@ -363,8 +395,7 @@ $("#run").onclick = async () => {
       setProgress(3 + 27 * (i + 1) / all.length, `已读取 ${i + 1}/${all.length} 个文件`);
     }
     for (const d of got.papers) if (d.sentences.length < 3) toast(`${d.name} 几乎没抽出文字，可能是扫描版 PDF`);
-    const useLLM = configuredClient && (settings.review || settings.apply || settings.semantic);
-    let before = null;
+    useLLM = configuredClient && (settings.review || settings.apply || settings.semantic);
     if (useLLM) {
       costByBalance = null;
       $("#costV").textContent = "…"; $("#costS").textContent = "运行中，实时统计";
@@ -379,22 +410,14 @@ $("#run").onclick = async () => {
       }
     });
     setProgress(92, "正在整理检测结果…");
-    last = { ...res, settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
-    if (useLLM && before) {
-      await say("更新余额…"); await new Promise(r => setTimeout(r, 1500));
-      const after = await refreshBalance(true);
-      if (after && after.currency === before.currency) {
-        const d = before.amount != null && after.amount != null ? before.amount - after.amount : (after.used ?? 0) - (before.used ?? 0);
-        if (d >= 0) costByBalance = { amount: d, currency: after.currency };
-      }
-      showUsage(usage);
-      if (costByBalance && costByBalance.amount === 0 && usage.calls) $("#costS").textContent = "余额暂未变化（部分服务商扣费有延迟，稍后点“刷新”）";
-    }
-    last.accountText = $("#meter").innerText;
+    last = { ...res, corpusDocs: got.corpus, excludeDocs: got.exclude, conversations: res.docs.map(() => []), revisions: res.docs.map(() => 0), settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
+    if (useLLM) { await say("自动更新余额与消耗…"); await settleBilling(before, null, billingGeneration); }
+    snapshotAccount();
     showResults(last);
     setProgress(100, "全部检测与报告整理已完成"); completed = true;
   } catch (e) {
     failure = e.message; last = null;
+    if (useLLM) await settleBilling(before, null, billingGeneration).catch(err => console.error(err));
     $("#runSummary").textContent = "本次检测未完成：" + e.message;
     console.error(e);
   } finally {
@@ -446,9 +469,8 @@ function paperCard(r, k) {
     <div class="cats">${Object.entries(f.byCategory).map(([c, v]) => `<span>${esc(cats[c].label)}</span><div class="bar" style="width:${Math.max(2, v * 200)}%;background:${CAT_COLOR[c]}"></div><span>${pct(v, 0)}</span>`).join("")}</div></div>` : "";
   const tabs = [["prompt", "优化提示词"], ...(sg ? [["sug", "AI 修改建议"]] : []), ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
   return `<section class="card paper" data-k="${k}">
-    <h3>${esc(doc.name)}</h3><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
+    <h3>${esc(doc.name)}</h3><div class="revision">${r.revisions?.[k] ? `已完成 ${r.revisions[k]} 轮继续优化 · 指标已按修订正文重算` : "初次检测结果"}</div><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
     <div class="metrics">${dupBox}${defBox}</div>
-    ${stylePanel(r.style[k])}
     <div class="recommendations"><h4>修改建议</h4><ul>${advice(r, k).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
     <div class="tabs">${tabs.map(([id, t], i) => `<button data-t="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div>
     <div class="pane on" data-p="prompt"><div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
@@ -457,25 +479,22 @@ function paperCard(r, k) {
       ${f.llmHits.length ? `<div class="hint" style="margin-top:12px">大模型额外判定的防御句：</div>` + f.llmHits.map(h => `<div class="sent"><div class="t">${esc(h.category)}</div>${esc(h.text)}</div>`).join("") : ""}</div>` : ""}
     ${d ? `<div class="pane" data-p="pairs">${d.pairs.length ? d.pairs.map(([s, a, src, b]) => `<div class="pair"><span class="s">${pct(s, 0)}</span> · 来源 ${esc(src)}<br>本文：${esc(a)}<br>来源：${esc(b)}</div>`).join("") : `<div class="none">没有相似句</div>`}</div>
       <div class="pane" data-p="full"><div class="legend"><span><i style="background:rgba(255,60,142,.6)"></i>逐字重复</span><span><i style="background:rgba(255,176,0,.55)"></i>改写相似</span><span><i style="background:rgba(143,92,255,.5)"></i>赛题原文</span></div><div class="fulltext">${highlightDup(doc.text, d.spans)}</div></div>` : ""}
+    ${r.revisions?.[k] ? `<details class="revised"><summary>查看当前修订正文</summary><textarea readonly class="prompt">${esc(doc.text)}</textarea><button class="btn sm revised-download">下载修订正文</button></details>` : ""}
+    <section class="followup"><h4>继续对话优化</h4><p class="hint">输入自定义要求，将发送当前论文、报告和已有对话到你选择的服务商。生成完整修订正文后，自动更新所有论文的比对指标与报告。</p>
+    ${(r.conversations?.[k] || []).length ? `<details><summary>查看 ${r.conversations[k].length} 轮对话记录</summary>${r.conversations[k].map((turn, i) => `<div class="sent"><b>第 ${i + 1} 轮要求</b><p>${esc(turn.request)}</p><b>修改说明</b><div class="md">${esc(turn.suggestion)}</div></div>`).join("")}</details>` : ""}
+    <label>本轮优化要求<textarea class="followup-input" rows="4" placeholder="例如：保留所有数值，把摘要改得更简洁，并说明每处修改理由。"></textarea></label>
+    <button class="btn primary followup-send">继续优化并更新结果</button><p class="followup-status" role="status"></p></section>
   </section>`;
 }
 function advice(r, k) {
-  const a = [], d = r.dup[k], f = r.dfn[k], s = r.style[k];
+  const a = [], d = r.dup[k], f = r.dfn[k];
   if (d?.total > 0) a.push("优先核对下方重复高亮与来源，为引用补充标注，并用自己的论证说明模型选择。");
   if (f?.summary > r.targets[0]) a.push("摘要防御率超过本次目标：逐句检查免责和限定表达，用可验证的结果支撑结论。");
   if (f?.body > r.targets[1]) a.push("正文防御率超过本次目标：保留必要假设，将重复的局限说明集中整理。");
-  if (s.hits.length) a.push(`有 ${s.hits.length} 句命中模板表达，结合下方原句替换为空泛措辞所指的具体事实。`);
+
   if (!a.length) a.push("当前规则未提示优先修改项，请继续人工核对数据、引用、模型假设和结论。");
-  a.push("AI / GPT 写作来源尚不可判定；如需记录真实使用情况，请依据写作过程和版本记录整理 AI 使用报告。");
+
   return a;
-}
-function stylePanel(s) {
-  return `<section class="style-review"><h4>AI 写作特征观察</h4><div class="metrics">
-    <div class="metric"><div class="lab">模板化表达句占比</div><div class="big">${pct(s.rate)}</div><div class="hint">${s.hits.length} / ${s.total} 句 · 规则命中比例</div></div>
-    <div class="metric"><div class="lab">AI 生成率</div><div class="unknown">尚不可判定</div><div class="hint">未接入经过验证的来源检测服务</div></div>
-    <div class="metric"><div class="lab">GPT 写作率</div><div class="unknown">尚不可判定</div><div class="hint">无法仅凭风格确定具体生成模型</div></div></div>
-    <p class="hint">${esc(s.note)} 学术惯用语也可能命中；0% 也不代表人工写作。</p>
-    ${s.hits.length ? `<details><summary>查看 ${s.hits.length} 句命中依据</summary>${s.hits.map(h => `<div class="sent"><div class="t">第 ${h.index + 1} 句 · ${h.signals.map(esc).join(" / ")}</div>${esc(h.text)}</div>`).join("")}</details>` : ""}</section>`;
 }
 function summaryPanel(r) {
   const s = r.settings;
@@ -485,7 +504,7 @@ function summaryPanel(r) {
     "摘要 / 正文目标": r.targets.map(x => pct(x,0)).join(" / "), "改写相似阈值": s.threshold,
     "提示词附全文": s.embedText ? "是" : "否", "对话模型": s.model,
     "防御句复核": s.review ? "开启" : "关闭", "语义检测": s.semantic ? "开启" : "关闭",
-    "模型修改建议": s.apply ? "开启" : "关闭", "风格检测方法": "本地词典 · template-lexicon-v1"
+    "模型修改建议": s.apply ? "开启" : "关闭", "累计继续优化": (r.revisions || []).reduce((a,b) => a+b,0) + " 轮"
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
 }
 function showResults(r) {
@@ -501,6 +520,8 @@ function showResults(r) {
     });
     card.querySelector(".cp").onclick = () => copy(r.prompts[k]);
     card.querySelector(".cps")?.addEventListener("click", () => copy(r.suggestions[k]));
+    card.querySelector(".followup-send").onclick = () => continuePaper(r, k, card);
+    card.querySelector(".revised-download")?.addEventListener("click", () => download(`${r.docs[k].name}_修订正文.txt`, r.docs[k].text, "text/plain"));
     card.querySelector(".dl").onclick = () => download(`${r.docs[k].name}_优化提示词.md`, r.prompts[k], "text/markdown");
   });
   $("#results").scrollIntoView({ behavior: "smooth" });
@@ -520,23 +541,23 @@ $("#dlPrompts").onclick = () => last && download(`papersim_提示词_${stamp()}.
 $("#dlCsv").onclick = () => {
   if (!last) return;
   const f4 = x => x == null ? "" : x.toFixed(4);
-  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "模板化表达句占比", "AI生成率状态", "GPT写作率状态"]];
+  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "继续优化轮数"]];
   last.docs.forEach((d, i) => {
     const u = last.dup[i], f = last.dfn[i], top = u ? Object.entries(u.bySource)[0] || ["", 0] : ["", null];
     rows.push([d.name, d.nWords, d.sentences.length, f4(u?.total), f4(u?.exact), f4(u?.paraphrase), f4(u?.excluded), top[0], f4(top[1]),
-      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), f4(last.style[i].rate), "尚不可判定", "尚不可判定"]);
+      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), last.revisions?.[i] || 0]);
   });
   download(`papersim_${stamp()}.csv`, "﻿" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 };
 $("#dlJson").onclick = () => {
   if (!last) return;
-  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], style: last.style[i], settings: last.settings, advice: advice(last, i), prompt: last.prompts[i], suggestion: last.suggestions[i] }));
+  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], settings: last.settings, advice: advice(last, i), prompt: last.prompts[i], suggestion: last.suggestions[i], conversation: last.conversations?.[i] || [], revision: last.revisions?.[i] || 0, usage: last.usage, account: last.accountText }));
   download(`papersim_${stamp()}.json`, JSON.stringify(out, null, 1), "application/json");
 };
 $("#dlReport").onclick = () => {
   if (!last) return;
   const css = [...document.styleSheets].map(s => { try { return [...s.cssRules].map(r => r.cssText).join("\n"); } catch (e) { return ""; } }).join("\n");
-  const body = summaryPanel(last) + last.docs.map((_, k) => paperCard(last, k)).join("");
+  const body = summaryPanel(last) + `<section class="card"><h3>账户与用量</h3><pre>${esc(last.accountText)}</pre></section>` + last.docs.map((_, k) => paperCard(last, k)).join("");
   const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>papersim 报告</title><style>${css}
     .pane{display:block!important;margin-bottom:16px}.tabs{display:none}textarea.prompt{height:auto;min-height:300px}.fulltext,.md{max-height:none}</style></head>
     <body><div class="wrap"><header><h1>papersim 报告</h1><span class="sub">${new Date().toLocaleString()}</span></header>${body}</div></body></html>`;
@@ -546,13 +567,12 @@ render();
 
 function pdfBlocks(r) {
   const blocks = [{ heading: true, text: "综合检测结果" },
-    { text: "模板化表达句占比只用于观察写作特征。AI 生成率与 GPT 写作率尚不可判定。" },
     { heading: true, text: "本次参数" }];
   const summary = document.createElement("div"); summary.innerHTML = summaryPanel(r);
   summary.querySelectorAll(".summary-grid > div").forEach(el => blocks.push({ text: el.querySelector("dt").textContent + "：" + el.querySelector("dd").textContent }));
   blocks.push({ heading: true, text: "账户与本次消耗" }, { text: r.accountText || "未调用大模型" });
   r.docs.forEach((doc, i) => {
-    const d = r.dup[i], f = r.dfn[i], s = r.style[i];
+    const d = r.dup[i], f = r.dfn[i];
     blocks.push({ heading: true, text: `${i + 1}. ${doc.name}` }, { text: `${doc.nWords} 词 / ${doc.sentences.length} 句` });
     if (d) {
       blocks.push({ text: `总重复率 ${pct(d.total)}；逐字 ${pct(d.exact)}；改写 ${pct(d.paraphrase)}；赛题引用 ${pct(d.excluded)}` });
@@ -562,11 +582,8 @@ function pdfBlocks(r) {
       blocks.push({ text: `防御性语言率 ${pct(f.rate)}；摘要 ${pct(f.summary)}；正文 ${pct(f.body)}；强度 ${f.intensity.toFixed(2)} 分/千词；大模型复核 ${pct(f.llmRate)}` });
       Object.entries(f.byCategory).forEach(([key, rate]) => blocks.push({ text: `${r.lex.categories[key].label}：${pct(rate)}` }));
     }
-    blocks.push({ text: `模板化表达句占比 ${pct(s.rate)}（${s.hits.length}/${s.total} 句）。AI 生成率：尚不可判定；GPT 写作率：尚不可判定。` }, { heading: true, text: "修改建议" });
+    blocks.push({ heading: true, text: "修改建议" });
     advice(r, i).forEach(text => blocks.push({ text }));
-    if (s.hits.length) blocks.push({ heading: true, text: "模板表达与命中依据" });
-    s.hits.forEach(h => blocks.push({ text: `第 ${h.index + 1} 句 / ${h.signals.join("、")}
-${h.text}` }));
     if (f?.hits.length) blocks.push({ heading: true, text: "防御性语言与依据" });
     f?.hits.forEach(h => blocks.push({ text: `第 ${h.index + 1} 句 / 得分 ${h.score} / ${h.categories.map(c => r.lex.categories[c].label).join("、")}
 ${h.text}` }));
@@ -576,6 +593,10 @@ ${h.text}` }));
     d?.pairs.forEach(([rate, text, source, original]) => blocks.push({ text: `相似度 ${pct(rate)} / 来源 ${source}
 本文：${text}
 来源原文：${original}` }));
+    if (r.revisions?.[i]) {
+      blocks.push({ heading: true, text: "当前修订正文" }, { text: doc.text });
+      (r.conversations[i] || []).forEach((turn, n) => blocks.push({ heading: true, text: `继续优化第 ${n + 1} 轮` }, { text: `要求：${turn.request}\n修改说明：${turn.suggestion}` }));
+    }
     blocks.push({ heading: true, text: "专项优化提示词" }, { text: r.prompts[i] });
     blocks.push({ heading: true, text: "AI 修改建议" }, { text: r.suggestions[i] || "本次未生成模型修改建议。上方修改建议由检测规则给出。" });
   });
@@ -594,3 +615,47 @@ $("#dlPdf").onclick = async () => {
   } catch (e) { toast("PDF 导出失败：" + e.message); console.error(e); }
   finally { btn.textContent = "一键下载 PDF 报告 ↓"; btn.disabled = !last; }
 };
+
+async function continuePaper(r, k, card) {
+  if (blocked() || r !== last) return;
+  const request = card.querySelector(".followup-input").value.trim(), notice = card.querySelector(".followup-status");
+  if (!request) { notice.textContent = "请先填写本轮优化要求"; return; }
+  const c = client();
+  if (!c || !$("#key").value.trim()) { notice.textContent = "请先在上方填写 API Key 并选择对话模型"; return; }
+  if (billingOwner !== billingIdentity()) { billingOwner = billingIdentity(); costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 }); }
+  const oldUsage = { ...usage }, previousCost = costByBalance;
+  c.usage = { ...usage }; stopBillingPolls();
+  const generation = billingGeneration;
+  let before = null, success = false, error = null;
+  lockDetection(true); $("#progressState").textContent = "继续优化中，请等待";
+  $("#run").textContent = "继续优化中…"; setProgress(5, "准备本轮对话与论文内容…");
+  try {
+    before = await refreshBalance(true);
+    const turns = r.conversations?.[k] || [];
+    const messages = [{ role: "system", content: '你是论文写作编辑。保留原文数字、公式、引用、事实和结论方向，不编造数据或文献；保留必要假设与学术诚信披露。遵循用户的本轮修改要求。只返回 JSON 对象，必须包含 revisedText（完整修订论文纯文本，不是摘要或局部片段）与 suggestion（修改说明与尚待作者核实的项目）。不可自行宣称检测分数，指标由本地引擎重算。' },
+      ...turns.flatMap(t => [{ role: "user", content: t.request }, { role: "assistant", content: t.suggestion }]),
+      { role: "user", content: `当前论文：\n${r.docs[k].text}\n\n当前专项提示词：\n${r.prompts[k]}\n\n上一轮建议：\n${r.suggestions[k] || "无"}\n\n本轮自定义要求：\n${request}` }];
+    setProgress(20, "正在等待模型生成修订正文，请勿重复提交…"); await tick();
+    const answer = await c.chatMessagesJSON(messages);
+    if (typeof answer.revisedText !== "string" || !answer.revisedText.trim() || typeof answer.suggestion !== "string" || !answer.suggestion.trim()) throw new Error("模型未返回完整修订正文与修改说明，当前结果已保留，请重试或调整要求");
+    setProgress(60, "修订正文已生成，正在重算全部论文指标…");
+    const docs = [...r.docs]; docs[k] = E.makeDocument(answer.revisedText, r.docs[k].name, false, true);
+    const computed = await E.run({ docs, corpus: r.corpusDocs, exclude: r.excludeDocs, lex: r.lex,
+      opt: { only: r.settings.mode === "全部" ? null : r.settings.mode, paraThreshold: r.settings.threshold, level: r.settings.level, embedText: r.settings.embedText },
+      log: async text => { setProgress(progressValue, text); await tick(); }, progress: (n, total) => setProgress(60 + 30 * n / total) });
+    const conversations = (r.conversations || r.docs.map(() => [])).map(x => [...x]), revisions = [...(r.revisions || r.docs.map(() => 0))];
+    conversations[k].push({ request, suggestion: answer.suggestion, model: c.model }); revisions[k]++;
+    computed.suggestions[k] = answer.suggestion;
+    computed.prompts[k] += "\n\n## 用户本轮补充要求\n" + request;
+    last = { ...r, ...computed, conversations, revisions, settings: { ...r.settings, model: c.model, review: false, semantic: false, apply: true }, accountText: r.accountText };
+    showResults(last); success = true;
+  } catch (e) { last = r; error = e.message; console.error(e); }
+  finally {
+    setProgress(progressValue, "自动更新余额与本轮消耗…");
+    await settleBilling(before, previousCost, generation).catch(e => { $("#balS").textContent = "余额更新失败：" + e.message; snapshotAccount(); });
+    lockDetection(false); render();
+    if (success) { setProgress(100, `本轮优化完成，新增输入 ${usage.input - oldUsage.input}、输出 ${usage.output - oldUsage.output} tokens；全部指标和导出报告已更新`); $("#progressState").textContent = "继续优化完成"; $("#log").textContent = "继续优化完成"; }
+    else { $("#progressState").textContent = "继续优化未完成，原结果已保留"; $("#runProgress").classList.add("failed"); setProgress(progressValue, error || "优化失败，请重试"); notice.textContent = error || "优化失败，请重试"; }
+    snapshotAccount();
+  }
+}
