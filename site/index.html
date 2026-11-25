@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>papersim · 数模论文自查</title>
 <meta name="description" content="数学建模论文自查：重复率、防御性语言率，并生成专项 AI 优化提示词。纯浏览器运行，论文不上传。">
-<meta name="theme-color" content="#c8d5e4">
+<meta name="theme-color" content="#0d0b1e">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%224%22 fill=%22%230d0b1e%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2215%22 font-weight=%22900%22 text-anchor=%22middle%22 fill=%22%232de2e6%22 font-family=%22sans-serif%22%3Eps%3C/text%3E%3C/svg%3E">
 <style>
 :root{
@@ -229,8 +229,8 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 </style>
 <link rel="stylesheet" href="studio.css?v=conversation1">
 <link rel="stylesheet" href="appearance.css?v=3">
-<link rel="stylesheet" href="polish.css?v=1">
-<script src="appearance.js?v=3"></script>
+<link rel="stylesheet" href="noir.css?v=1">
+<script src="appearance.js?v=4"></script>
 </head>
 <body>
 <div class="cityscape" aria-hidden="true"></div>
@@ -239,53 +239,27 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 <div class="toast" id="toast" role="status"></div>
 <aside class="workspace-nav" aria-label="工作台导航">
   <a class="workspace-brand" href="#top">papersim<small>论文自查工作台</small></a>
-  <nav class="steps" aria-label="检测步骤">
-    <a href="#upload" data-step="upload" aria-current="location"><i aria-hidden="true">1</i><span>放入论文<small id="navUpload">还没有论文</small></span></a>
-    <a href="#detectionSettings" data-step="settings"><i aria-hidden="true">2</i><span>检测设置<small id="navSettings">第 5 挡</small></span></a>
-    <a href="#modelSettings" data-step="model"><i aria-hidden="true">3</i><span>大模型<small id="navModel">未连接，可跳过</small></span></a>
-    <a href="#results" data-step="results"><i aria-hidden="true">4</i><span>结果与优化<small id="navResults">等待检测</small></span></a>
-  </nav>
-  <div class="nav-bottom"><button class="btn appearance-trigger" data-open-appearance aria-haspopup="dialog">◐ 界面设置</button><p>论文在你的浏览器里解析，不会上传。</p></div>
+  <div><p class="nav-caption">WORKSPACE / 工作流程</p><nav>
+    <a href="#upload" aria-current="location"><span>01</span>放入论文</a>
+    <a href="#detectionSettings"><span>02</span>检测设置</a>
+    <a href="#modelSettings"><span>03</span>模型与服务商</a>
+    <a href="#results"><span>04</span>结果与继续优化</a>
+  </nav></div>
+  <div class="nav-bottom"><button class="btn appearance-trigger" data-open-appearance aria-haspopup="dialog">◐ 界面设置</button><p>论文在浏览器本地解析。<br>按需接入模型，逐轮查看修改依据。</p></div>
 </aside>
 <div class="wrap" id="top">
-  <header class="topbar">
-    <a class="topbar-brand" href="#top">papersim</a>
-    <div class="topbar-status" aria-label="当前状态">
-      <span class="pill local" id="pillLocal"><i></i>本地处理 · 论文不上传</span>
-      <span class="pill" id="pillModel"><i></i>未连接大模型</span>
-      <span class="pill" id="pillBalance" hidden></span>
-    </div>
+  <header>
+    <h1 class="logo">papersim</h1>
+    <span class="tagline">数模论文自查：<b>重复率</b>、<b>防御性语言率</b>，并生成专项优化提示词</span>
     <button class="btn appearance-trigger" data-open-appearance aria-haspopup="dialog">◐ 界面设置</button>
     <a class="gh" href="https://github.com/2024-dada/mathmodeling-paper-checking" target="_blank" rel="noopener">GitHub</a>
   </header>
   <section class="hero">
-    <div class="hero-copy">
-      <h1 class="hero-title">交卷之前，<br>把论文<em>过一遍</em>。</h1>
-      <p>逐句标出和别的论文撞车的段落、满篇“这不是预测”的免责话，以及推导里的漏洞。每一处都附依据，再按你选的力度生成交给 AI 的修改提示词。</p>
-      <div class="hero-actions"><a class="btn primary" href="#upload">放入论文</a><a class="btn ghost" href="#metricsNote">指标怎么算</a></div>
-      <ul class="hero-facts">
-        <li><b>4</b>类检查</li><li><b>10</b>挡改写力度</li><li><b>0</b>次上传</li>
-      </ul>
-    </div>
-    <figure class="specimen" aria-label="检测效果示例">
-      <div class="sheet">
-        <div class="sheet-head"><span>Summary</span><span class="sheet-file">lunar_base.pdf · 第 1 页</span></div>
-        <p class="sheet-text">
-          We model how construction material reaches a lunar base by two transport modes.
-          <mark class="m-dup" data-note="与比对库 original.pdf 逐字相同">The combined system finishes in 101 years, while the elevator alone needs 187 years.</mark>
-          <mark class="m-def" data-note="对照纠偏：先否认再陈述">These figures are illustrative scenarios rather than forecasts,</mark>
-          and the true launch cadence in 2050 is unknown.
-          <mark class="m-logic" data-note="逻辑疑点：前文只比较了工期，没有比较成本">The mixed plan is therefore the cheapest option</mark>
-          <mark class="m-def" data-note="范围限定">under the stated assumptions.</mark>
-        </p>
-        <div class="sheet-notes" aria-hidden="true"></div>
-      </div>
-      <figcaption class="readings">
-        <div><span>总重复率</span><b class="r-dup" data-to="18.4">0.0</b><em>%</em></div>
-        <div><span>防御性语言率</span><b class="r-def" data-to="23.3">0.0</b><em>%</em><small>目标 ≤ 10%</small></div>
-        <div><span>逻辑疑点</span><b class="r-logic" data-to="3">0</b><em>处</em></div>
-      </figcaption>
-    </figure>
+    <div class="eyebrow">PAPERSIM / WRITING OBSERVATORY</div>
+    <h2>让论证清晰。<br><em>让表达有据。</em></h2>
+    <p>从重复片段到防御性语言，把需要修改的地方看清楚。<br>放入论文，在同一份结果里查看指标、依据与建议。</p>
+    <div class="hero-actions"><a class="btn primary" href="#upload">开始自查 ↘</a><a class="btn" href="#results">前往结果区 ↓</a></div>
+    <div class="hero-caption">01 / 本地解析　　02 / 可追溯指标　　03 / 集中报告</div>
   </section>
   <div class="notice" id="notice">论文只在你的浏览器里解析和计算，不会上传到任何服务器。用大模型时，key 和句子由浏览器直接发给你选的服务商。</div>
 
@@ -319,14 +293,6 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
         <div class="gauge" id="gauge" role="radiogroup" aria-label="防御率挡位"></div>
         <div class="ends"><span>硬气</span><span>保守</span></div>
         <div class="gaugeinfo"><span class="lv" id="lvName"></span><span class="tg" id="lvTarget"></span><p id="lvTone"></p></div>
-        <div class="left-extra">
-        <div>
-          <label class="f">改写相似阈值</label>
-          <div class="range"><input type="range" id="para" min="0.4" max="0.9" step="0.05" value="0.6"><output id="paraV">0.60</output></div>
-          <div class="hint">越低越敏感，同题套话也会被抓出来。</div>
-        </div>
-        <label class="check"><input type="checkbox" id="embedText"><span>提示词附上论文全文<small>复制一次就能直接发给 AI，提示词会变长</small></span></label>
-        </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:20px">
         <div>
@@ -339,7 +305,12 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
           </div>
           <div class="hint">前两项在浏览器本地完成，不花钱。逻辑和幻觉风险检查需要填写 API Key 并选择模型，论文内容会发送给所选服务商。</div>
         </div>
-
+        <div>
+          <label class="f">改写相似阈值</label>
+          <div class="range"><input type="range" id="para" min="0.4" max="0.9" step="0.05" value="0.6"><output id="paraV">0.60</output></div>
+          <div class="hint">越低越敏感，同题套话也会被抓出来。</div>
+        </div>
+        <label class="check"><input type="checkbox" id="embedText"><span>提示词附上论文全文<small>复制一次就能直接发给 AI，提示词会变长</small></span></label>
       </div>
     </div>
   </section>
@@ -394,7 +365,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
   <div class="runbar">
     <button class="btn primary" id="run" disabled>开始检测</button>
     <div class="spinner" id="spin"></div>
-    <div class="runbar-text"><div class="log" id="log" role="status">先放入至少一篇被测论文</div><div class="runbar-plan" id="runPlan"></div></div>
+    <div class="log" id="log" role="status">先放入至少一篇被测论文</div>
   </div>
 
   <section id="runProgress" class="run-progress" hidden aria-label="检测进度">
@@ -406,7 +377,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 
   <section id="results" aria-label="综合检测结果">
     <div class="rhead">
-      <h2>综合结果</h2>
+      <h2>04 / 综合结果</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn sm" id="dlReport">下载报告（HTML）</button>
         <button class="btn sm" id="dlPrompts">下载全部提示词</button>
@@ -425,7 +396,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
     <div class="pdf-download"><div><h3>把结果带走</h3><p>本次参数、全部指标、判定依据、修改建议和优化提示词，合并为一份 PDF。浏览器本地生成，直接下载。</p></div><button class="btn primary" id="dlPdf" disabled>一键下载 PDF 报告 ↓</button></div>
   </section>
 
-  <footer id="metricsNote">
+  <footer>
     <p><b>指标说明。</b>总重复率是与比对库逐字重复（连续 8 个英文词或 13 个汉字）和改写相似（句子相似度不低于阈值）的词数占全文的比例；与赛题原文相同的部分单列，不计入。防御性语言率是防御性句数占总句数的比例：按否定式免责、对照纠偏、局限声明、范围限定、模糊限定 5 类打分，总分不低于 1 的句子算防御性句。</p>
     <p><b>服务商不允许网页直接调用时</b>，页面会提示“浏览器无法访问”。可以换一家服务商、填写支持跨域的中转地址，或者用本地版：<code>pip install -e .</code> 后运行 <code>papersim-web</code>，界面相同，API 请求经本机转发。</p>
     <p>本工具用于自查和改进写作。竞赛要求如实披露 AI 使用，请在论文的 AI 使用报告中说明。</p>
@@ -436,7 +407,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 <dialog id="appearanceDialog" class="appearance-dialog" aria-labelledby="appearanceTitle">
   <div class="appearance-heading"><h2 id="appearanceTitle">界面设置</h2><button type="button" data-close-appearance aria-label="关闭界面设置">×</button></div>
   <p class="appearance-intro">为你的阅读习惯调整工作台。设置即时生效，自动保存在当前浏览器，不影响检测参数。</p>
-  <fieldset><legend>选择主题</legend><div class="theme-options"><label class="theme-choice"><input type="radio" name="theme" value="porcelain"><span><span class="theme-swatches"><i style="background:#c8d5e4"></i><i style="background:#326aac"></i><i style="background:#20354b"></i></span><b>雾蓝灰</b></span><small>柔和蓝灰 · 清晰背景</small></label><label class="theme-choice"><input type="radio" name="theme" value="jade"><span><span class="theme-swatches"><i style="background:#f1f7f4"></i><i style="background:#277867"></i><i style="background:#1e3e35"></i></span><b>青瓷绿</b></span><small>柔和青绿 · 久读舒适</small></label><label class="theme-choice"><input type="radio" name="theme" value="paper"><span><span class="theme-swatches"><i style="background:#faf7f0"></i><i style="background:#8b642d"></i><i style="background:#40392b"></i></span><b>暖纸金</b></span><small>温暖纸色 · 简洁沉静</small></label><label class="theme-choice"><input type="radio" name="theme" value="harbor"><span><span class="theme-swatches"><i style="background:#131f30"></i><i style="background:#8cdae6"></i><i style="background:#e6f0fc"></i></span><b>科研港夜色</b></span><small>深蓝背景 · 清晰冷光</small></label><label class="theme-choice"><input type="radio" name="theme" value="system"><span><span class="theme-swatches"><i style="background:#c8d5e4"></i><i style="background:#131f30"></i><i style="background:#326aac"></i></span><b>跟随系统</b></span><small>根据设备外观切换明暗</small></label></div></fieldset>
+  <fieldset><legend>选择主题</legend><div class="theme-options"><label class="theme-choice"><input type="radio" name="theme" value="porcelain"><span><span class="theme-swatches"><i style="background:#c8d5e4"></i><i style="background:#326aac"></i><i style="background:#20354b"></i></span><b>雾蓝灰</b></span><small>柔和蓝灰 · 清晰背景</small></label><label class="theme-choice"><input type="radio" name="theme" value="jade"><span><span class="theme-swatches"><i style="background:#f1f7f4"></i><i style="background:#277867"></i><i style="background:#1e3e35"></i></span><b>青瓷绿</b></span><small>柔和青绿 · 久读舒适</small></label><label class="theme-choice"><input type="radio" name="theme" value="paper"><span><span class="theme-swatches"><i style="background:#faf7f0"></i><i style="background:#8b642d"></i><i style="background:#40392b"></i></span><b>暖纸金</b></span><small>温暖纸色 · 简洁沉静</small></label><label class="theme-choice"><input type="radio" name="theme" value="harbor"><span><span class="theme-swatches"><i style="background:#060a13"></i><i style="background:#6fe7fb"></i><i style="background:#eef4ff"></i></span><b>科研港夜色（默认）</b></span><small>夜景玻璃 · 冷光点缀</small></label><label class="theme-choice"><input type="radio" name="theme" value="system"><span><span class="theme-swatches"><i style="background:#c8d5e4"></i><i style="background:#131f30"></i><i style="background:#326aac"></i></span><b>跟随系统</b></span><small>根据设备外观切换明暗</small></label></div></fieldset>
   <fieldset><legend>阅读与布局</legend><div class="appearance-controls">
     <label><span class="control-title">字号<output id="appearanceSizeValue">16 px</output></span><input type="range" name="size" min="15" max="20" step="1" aria-label="界面字号"></label>
     <label><span class="control-title">行距<output id="appearanceLeadingValue">1.8</output></span><input type="range" name="leading" min="1.5" max="2.2" step="0.1" aria-label="阅读行距"></label>
@@ -449,6 +420,6 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
   <p class="appearance-status" role="status" aria-live="polite"></p>
   <div class="appearance-footer"><button class="btn" data-reset-appearance>恢复默认</button><button class="btn primary" data-appearance-done>完成</button></div>
 </dialog>
-<script type="module" src="app.js?v=polish1"></script>
+<script type="module" src="app.js?v=noir1"></script>
 </body>
 </html>

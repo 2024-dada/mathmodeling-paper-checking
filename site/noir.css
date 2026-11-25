@@ -1,0 +1,122 @@
+/* 视觉精修：只改外观，不改结构。深色“科研港夜色”为默认主题，浅色主题同步提升字体与层次。 */
+
+/* ---------- 通用：字体与层次（所有主题） ---------- */
+:root{--glow:0 0 0 transparent}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.hero h2{font-weight:800!important;letter-spacing:-.045em!important;line-height:1.12!important;font-size:clamp(42px,5vw,72px)!important}
+.card h2{font-weight:750!important;letter-spacing:-.02em!important}
+.metric .big,.meter .v,.gaugeinfo .tg,.range output{font-variant-numeric:tabular-nums}
+.btn{transition:transform .15s ease,box-shadow .2s ease,background .2s ease,border-color .2s ease,color .2s ease}
+.btn.primary:not(:disabled):hover{transform:translateY(-1px)}
+
+/* ---------- 深色主题 ---------- */
+:root[data-theme=harbor]{
+  --night:#060a13; --night2:#0b1220;
+  --panel:rgba(12,19,33,.66); --panel2:rgba(17,27,46,.72);
+  --ink:#eef4ff; --ink2:#aebbd2; --ink3:#7a8aa6;
+  --cyan:#6fe7fb; --magenta:#ff6fa5; --amber:#ffc46b; --mint:#5eead4; --violet:#a78bfa;
+  --line:rgba(150,185,255,.13); --line2:rgba(111,231,251,.38);
+  --field:rgba(5,10,20,.62); --accent-soft:rgba(111,231,251,.09); --button-ink:#03131b;
+  --shadow:0 30px 80px -34px rgba(0,0,0,.85);
+  --glass:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012) 38%,rgba(255,255,255,0));
+  --edge:inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px rgba(255,255,255,.035);
+  --glow:0 0 22px rgba(111,231,251,.35);
+}
+
+/* 背景：全幅夜景 + 调色 + 暗角 + 细颗粒 */
+[data-theme=harbor] body{background:transparent}
+[data-theme=harbor] .cityscape{opacity:1!important;filter:brightness(.62) saturate(1.2) contrast(1.06)!important;background-position:62% center!important}
+[data-theme=harbor] .veil{opacity:1;background:
+  radial-gradient(120% 90% at 78% 18%,rgba(40,170,210,.16),transparent 55%),
+  radial-gradient(90% 70% at 12% 100%,rgba(255,111,165,.08),transparent 60%),
+  linear-gradient(90deg,rgba(6,10,19,.88) 0%,rgba(6,10,19,.55) 42%,rgba(6,10,19,.2) 100%),
+  radial-gradient(140% 120% at 50% 40%,transparent 55%,rgba(0,0,0,.6) 100%)!important}
+[data-theme=harbor] .veil::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* 玻璃面板 */
+[data-theme=harbor] .card,[data-theme=harbor] header,[data-theme=harbor] .notice,[data-theme=harbor] footer,
+[data-theme=harbor] .run-progress,[data-theme=harbor] .pdf-download,[data-theme=harbor] .workspace-nav{
+  background:var(--glass),var(--panel)!important;border:1px solid var(--line)!important;
+  box-shadow:var(--edge),var(--shadow)!important;backdrop-filter:blur(20px) saturate(1.35)!important;-webkit-backdrop-filter:blur(20px) saturate(1.35)!important}
+[data-theme=harbor] .workspace-nav{border-width:0 1px 0 0!important;background:linear-gradient(180deg,rgba(255,255,255,.04),transparent 30%),rgba(7,12,22,.72)!important}
+
+/* 侧栏 */
+[data-theme=harbor] .workspace-brand{background:linear-gradient(100deg,#fff 20%,var(--cyan) 120%);-webkit-background-clip:text;background-clip:text;color:transparent!important}
+[data-theme=harbor] .workspace-nav nav a{position:relative;transition:background .2s,color .2s}
+[data-theme=harbor] .workspace-nav nav a[aria-current]{background:linear-gradient(90deg,rgba(111,231,251,.14),rgba(111,231,251,.02))!important;color:#fff!important}
+[data-theme=harbor] .workspace-nav nav a[aria-current]::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:2px;background:var(--cyan);box-shadow:var(--glow)}
+[data-theme=harbor] .workspace-nav nav a[aria-current] span{color:var(--cyan)}
+
+/* 顶栏 */
+[data-theme=harbor] header .logo{background:linear-gradient(100deg,#fff 30%,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* 首屏：让夜景透出来，标题有光 */
+[data-theme=harbor] .hero{background:linear-gradient(100deg,rgba(8,14,26,.78) 0%,rgba(8,14,26,.5) 45%,rgba(8,14,26,.08) 100%)!important;border-color:rgba(150,185,255,.16)!important;box-shadow:var(--edge),0 40px 100px -40px rgba(0,0,0,.9)!important;backdrop-filter:none!important}
+[data-theme=harbor] .hero::after{opacity:.0!important}
+[data-theme=harbor] .hero h2{background:linear-gradient(180deg,#ffffff 0%,#d8e6ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 8px 30px rgba(0,0,0,.45))}
+[data-theme=harbor] .hero h2 em{background:linear-gradient(100deg,#9ef3ff 0%,var(--cyan) 45%,#4fb8ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(111,231,251,.35))}
+[data-theme=harbor] .hero p{color:#c3d0e4!important}
+[data-theme=harbor] .eyebrow{color:var(--cyan)!important;opacity:.9}
+[data-theme=harbor] .eyebrow::before{background:var(--cyan)!important;box-shadow:var(--glow)!important}
+[data-theme=harbor] .hero-caption{color:#8fa0bb!important}
+
+/* 按钮 */
+[data-theme=harbor] .btn{background:rgba(255,255,255,.04)!important;border:1px solid rgba(255,255,255,.12)!important;color:var(--ink)!important}
+[data-theme=harbor] .btn:hover{border-color:var(--line2)!important;color:#fff!important;background:rgba(111,231,251,.08)!important}
+[data-theme=harbor] .btn.primary{background:linear-gradient(135deg,#a5f3fc 0%,var(--cyan) 45%,#38bdf8 100%)!important;color:var(--button-ink)!important;border:0!important;
+  box-shadow:0 0 0 1px rgba(165,243,252,.5) inset,0 12px 30px -10px rgba(56,189,248,.7),0 0 40px -12px rgba(111,231,251,.6)!important}
+[data-theme=harbor] .btn.primary:hover{filter:brightness(1.06)!important;box-shadow:0 0 0 1px rgba(165,243,252,.7) inset,0 16px 36px -10px rgba(56,189,248,.8),0 0 50px -10px rgba(111,231,251,.7)!important}
+[data-theme=harbor] .btn.primary:disabled{background:rgba(255,255,255,.06)!important;color:var(--ink3)!important;box-shadow:none!important}
+
+/* 卡片标题与序号 */
+[data-theme=harbor] .card h2{color:#fff}
+[data-theme=harbor] .card h2 .n{background:rgba(111,231,251,.1)!important;color:var(--cyan)!important;box-shadow:0 0 0 1px rgba(111,231,251,.35) inset,var(--glow)}
+[data-theme=harbor] .card .desc{color:var(--ink3)!important}
+
+/* 上传区 */
+[data-theme=harbor] .zone{background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,0)),var(--field)!important;border:1px dashed rgba(150,185,255,.22)!important}
+[data-theme=harbor] .zone:hover,[data-theme=harbor] .zone.drag{border-color:var(--cyan)!important;background:rgba(111,231,251,.06)!important;box-shadow:0 0 0 1px rgba(111,231,251,.25) inset,0 0 40px -10px rgba(111,231,251,.35)!important}
+[data-theme=harbor] .zone .empty b{color:var(--cyan)!important;text-shadow:var(--glow)!important}
+[data-theme=harbor] .chip{background:rgba(111,231,251,.07)!important;border-color:rgba(111,231,251,.2)!important}
+
+/* 表单 */
+[data-theme=harbor] input[type=text],[data-theme=harbor] input[type=password],[data-theme=harbor] input[type=number],[data-theme=harbor] select,[data-theme=harbor] textarea,[data-theme=harbor] .combo .cv{
+  background:var(--field)!important;border:1px solid rgba(150,185,255,.16)!important;transition:border-color .2s,box-shadow .2s}
+[data-theme=harbor] input:focus,[data-theme=harbor] select:focus,[data-theme=harbor] textarea:focus{border-color:var(--cyan)!important;box-shadow:0 0 0 3px rgba(111,231,251,.15)!important;outline:none!important}
+[data-theme=harbor] .inspection-options{background:var(--field)!important;border-color:rgba(150,185,255,.14)!important}
+[data-theme=harbor] input[type=checkbox],[data-theme=harbor] input[type=range]{accent-color:var(--cyan)}
+[data-theme=harbor] .pop{background:rgba(10,16,30,.96)!important;border-color:var(--line2)!important;box-shadow:0 30px 70px -20px rgba(0,0,0,.9),0 0 40px -15px rgba(111,231,251,.4)!important;backdrop-filter:blur(16px)}
+
+/* 挡位条：点亮的格子发光 */
+[data-theme=harbor] .gauge button{background:rgba(255,255,255,.035)!important;border-color:rgba(150,185,255,.14)!important}
+[data-theme=harbor] .gauge button.lit{background:linear-gradient(180deg,var(--c),color-mix(in srgb,var(--c) 35%,transparent))!important;box-shadow:0 0 18px -4px var(--c)!important;border-color:color-mix(in srgb,var(--c) 70%,transparent)!important}
+[data-theme=harbor] .gauge button.cur{outline:1px solid color-mix(in srgb,var(--c) 80%,white);outline-offset:2px}
+[data-theme=harbor] .gaugeinfo .lv{color:#fff}
+
+/* 结果 */
+[data-theme=harbor] .metric{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,0)),var(--field)!important;border-color:rgba(150,185,255,.14)!important}
+[data-theme=harbor] .metric.dup .big{color:var(--magenta)!important;text-shadow:0 0 28px rgba(255,111,165,.45)!important}
+[data-theme=harbor] .metric.def .big{color:var(--cyan)!important;text-shadow:0 0 28px rgba(111,231,251,.4)!important}
+[data-theme=harbor] .meter .v.money{color:var(--amber)!important;text-shadow:0 0 22px rgba(255,196,107,.35)!important}
+[data-theme=harbor] .track{background:rgba(255,255,255,.08)!important}
+[data-theme=harbor] .track .fill{box-shadow:0 0 12px currentColor!important}
+[data-theme=harbor] .progress-track>div{background:linear-gradient(90deg,#38bdf8,var(--cyan),#a5f3fc)!important;box-shadow:0 0 16px rgba(111,231,251,.6)}
+[data-theme=harbor] .recommendations{background:linear-gradient(90deg,rgba(111,231,251,.08),rgba(111,231,251,.01))!important;border-left-color:var(--cyan)!important}
+[data-theme=harbor] .tabs button.on{color:var(--cyan)!important;border-color:var(--cyan)!important}
+[data-theme=harbor] .rhead h2{color:#fff}
+[data-theme=harbor] .notice{border-left:2px solid var(--mint)!important}
+[data-theme=harbor] .toast{background:var(--cyan)!important;color:var(--button-ink)!important;box-shadow:0 10px 30px -8px rgba(111,231,251,.6)}
+[data-theme=harbor] ::selection{background:rgba(111,231,251,.35);color:#fff}
+[data-theme=harbor] ::-webkit-scrollbar{width:10px;height:10px}
+[data-theme=harbor] ::-webkit-scrollbar-thumb{background:rgba(150,185,255,.18);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
+[data-theme=harbor] ::-webkit-scrollbar-track{background:transparent}
+
+/* 入场：只在首屏标题做一次 */
+@media (prefers-reduced-motion:no-preference){
+  [data-theme=harbor]:not([data-motion=reduce]) .hero h2,[data-theme=harbor]:not([data-motion=reduce]) .hero p,[data-theme=harbor]:not([data-motion=reduce]) .hero-actions{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+  [data-theme=harbor]:not([data-motion=reduce]) .hero p{animation-delay:.12s}
+  [data-theme=harbor]:not([data-motion=reduce]) .hero-actions{animation-delay:.22s}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+}
+@media(max-width:760px){[data-theme=harbor] .veil{background:linear-gradient(180deg,rgba(6,10,19,.55),rgba(6,10,19,.85))!important}}

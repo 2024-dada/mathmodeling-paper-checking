@@ -1,6 +1,6 @@
 (() => {
-  const root = document.documentElement, key = "papersim-appearance-v1";
-  const defaults = { theme: "porcelain", font: "sans", size: 16, leading: 1.8, width: "standard", density: "comfortable", background: 62, motion: false, contrast: false };
+  const root = document.documentElement, key = "papersim-appearance-v2", oldKey = "papersim-appearance-v1";
+  const defaults = { theme: "harbor", font: "sans", size: 16, leading: 1.8, width: "standard", density: "comfortable", background: 62, motion: false, contrast: false };
   function normalize(raw = {}) {
     const one = (name, allowed) => allowed.includes(raw[name]) ? raw[name] : defaults[name];
     const number = (name, min, max) => typeof raw[name] === "number" && Number.isFinite(raw[name]) ? Math.min(max, Math.max(min, raw[name])) : defaults[name];
@@ -8,7 +8,11 @@
   }
   function load() {
     try {
-      const saved = JSON.parse(localStorage.getItem(key)) || {};
+      let saved = JSON.parse(localStorage.getItem(key));
+      if (!saved) {   // 从旧版设置迁移：保留字号、字体、布局等，主题改用新的默认值
+        saved = JSON.parse(localStorage.getItem(oldKey)) || {};
+        delete saved.theme;
+      }
       if (saved.backgroundVersion !== 2 && saved.background === 12) saved.background = defaults.background;
       return normalize(saved);
     } catch { return { ...defaults }; }
@@ -17,7 +21,7 @@
   const scheme = matchMedia("(prefers-color-scheme: dark)");
   function apply() {
     root.dataset.theme = config.theme === "system" ? (scheme.matches ? "harbor" : "porcelain") : config.theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", root.dataset.theme === "harbor" ? "#131f30" : { porcelain: "#c8d5e4", jade: "#f1f7f4", paper: "#faf7f0" }[root.dataset.theme]);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", root.dataset.theme === "harbor" ? "#060a13" : { porcelain: "#c8d5e4", jade: "#f1f7f4", paper: "#faf7f0" }[root.dataset.theme]);
     root.dataset.font = config.font; root.dataset.density = config.density;
     root.dataset.motion = config.motion ? "reduce" : "normal"; root.dataset.contrast = config.contrast ? "high" : "normal";
     root.style.setProperty("--ui-size", config.size + "px"); root.style.setProperty("--ui-leading", config.leading);

@@ -100,8 +100,6 @@ function render() {
     z.querySelector(".empty").style.display = files[g].length ? "none" : "";
     box.querySelectorAll(".x").forEach(b => b.onclick = e => { e.stopPropagation(); if (blocked()) return; files[g].splice(+b.dataset.i, 1); render(); });
   });
-  document.body.classList.toggle("has-files", files.papers.length > 0);
-  if (typeof updateChrome === "function") queueMicrotask(updateChrome);
   const ok = files.papers.length > 0 && !!document.querySelector("#mode input:checked"), busy = $("#run").dataset.busy === "1";
   $("#run").disabled = !ok || busy;
   if (!busy) {
@@ -159,7 +157,6 @@ function drawGauge() {
   $("#lvName").textContent = `第 ${level} 挡 · ${lv.name}${level === E.DEFAULT_LEVEL ? "（推荐）" : ""}`;
   $("#lvTarget").textContent = `摘要 ≤ ${Math.round(lv.summary * 100)}%　正文 ≤ ${Math.round(lv.body * 100)}%`;
   $("#lvTone").textContent = lv.tone;
-  if (typeof updateChrome === "function") queueMicrotask(updateChrome);
 }
 $("#gauge").addEventListener("keydown", e => {
   if (detecting) return;
@@ -356,7 +353,7 @@ async function settleBilling(before, previousCost, generation) {
 /* ---------------- API 识别 ---------------- */
 $("#prov").innerHTML = `<option value="">自动识别</option>` + Object.entries(E.PROVIDERS).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("") + `<option value="custom">自定义地址</option>`;
 let seq = 0, timer = null;
-function status(kind, text) { $("#st").className = "status " + kind; $("#stT").textContent = text; queueMicrotask(updateChrome); }
+function status(kind, text) { $("#st").className = "status " + kind; $("#stT").textContent = text; }
 function showErr(t) { const e = $("#err"); e.textContent = t || ""; e.style.display = t ? "block" : "none"; }
 
 async function detectModels(autoOpen = true) {
@@ -732,50 +729,3 @@ async function continuePaper(r, k, card) {
   }
 }
 
-
-/* ---------------- 首屏化验单 ---------------- */
-{
-  const spec = document.querySelector(".specimen");
-  if (spec) {
-    const colors = { "m-dup": "var(--magenta)", "m-def": "#3b7bd6", "m-logic": "#d08a1c" };
-    spec.querySelector(".sheet-notes").innerHTML = [...spec.querySelectorAll(".sheet-text mark")].map(m =>
-      `<div><i style="background:${colors[m.className]}"></i>${esc(m.dataset.note)}</div>`).join("");
-    spec.querySelectorAll(".sheet-notes div").forEach((d, i) => d.style.transitionDelay = (0.4 + i * 0.35) + "s");
-    const still = document.documentElement.dataset.motion === "reduce" || matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const count = () => spec.querySelectorAll(".readings b").forEach(b => {
-      const to = +b.dataset.to, dec = String(b.dataset.to).includes(".") ? 1 : 0;
-      if (still) { b.textContent = to.toFixed(dec); return; }
-      const t0 = performance.now(), dur = 1400;
-      const step = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); b.textContent = (to * e).toFixed(dec); if (k < 1) requestAnimationFrame(step); };
-      requestAnimationFrame(step);
-    });
-    const start = () => { spec.classList.add("lit"); count(); };
-    if (still) start(); else setTimeout(start, 450);
-  }
-}
-
-/* ---------------- 侧栏步骤、顶栏状态、操作条说明 ---------------- */
-function updateChrome() {
-  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
-  const step = (name, done) => document.querySelector(`.steps a[data-step="${name}"]`)?.classList.toggle("done", !!done);
-  const np = files.papers.length, nc = files.corpus.length, ne = files.exclude.length;
-  set("navUpload", np ? `${np} 篇论文${nc ? ` · 比对库 ${nc}` : ""}${ne ? " · 含赛题" : ""}` : "还没有论文");
-  step("upload", np > 0);
-  const checks = [...document.querySelectorAll("#mode input:checked")].map(x => ({ dup: "重复率", def: "防御性语言", logic: "逻辑", hallucination: "幻觉风险" })[x.dataset.check]);
-  set("navSettings", `第 ${level} 挡 · ${checks.length ? checks.length + " 项检查" : "未选检查项"}`);
-  step("settings", checks.length > 0);
-  const connected = $("#st")?.classList.contains("ok") && chat.value;
-  const pName = provider && E.PROVIDERS[provider] ? E.PROVIDERS[provider].name : provider === "custom" ? "自定义服务" : "";
-  set("navModel", connected ? `${pName} · ${chat.value}` : $("#key").value.trim() ? "未连接成功" : "未连接，可跳过");
-  step("model", connected);
-  set("navResults", detecting ? "检测中…" : last ? `已完成 · ${last.docs.length} 篇` : "等待检测");
-  step("results", !!last && !detecting);
-  const pm = $("#pillModel");
-  if (pm) { pm.className = "pill" + (connected ? " on" : $("#st")?.classList.contains("err") ? " warn" : ""); pm.innerHTML = `<i></i>${connected ? esc(pName + " · " + chat.value) : $("#st")?.classList.contains("err") ? "大模型连接失败" : "未连接大模型"}`; }
-  const pb = $("#pillBalance"), bv = $("#balV")?.textContent;
-  if (pb) { const show = connected && bv && bv !== "—"; pb.hidden = !show; if (show) pb.innerHTML = `余额 <b>${esc(bv)}</b>`; }
-  const plan = $("#runPlan");
-  if (plan) plan.textContent = np ? `${checks.join("、") || "未选检查项"} · 第 ${level} 挡${connected ? " · " + chat.value : ""}` : "支持 PDF、DOCX、TXT、MD、TEX，可直接拖进页面";
-}
-setInterval(() => { if (!document.hidden) updateChrome(); }, 1500);
-updateChrome();
