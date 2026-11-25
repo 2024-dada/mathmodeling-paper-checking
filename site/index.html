@@ -228,8 +228,8 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 <link rel="stylesheet" href="studio.css?v=conversation1">
-<link rel="stylesheet" href="appearance.css?v=1">
-<script src="appearance.js?v=1"></script>
+<link rel="stylesheet" href="appearance.css?v=2">
+<script src="appearance.js?v=2"></script>
 </head>
 <body>
 <div class="cityscape" aria-hidden="true"></div>
@@ -401,14 +401,14 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 <dialog id="appearanceDialog" class="appearance-dialog" aria-labelledby="appearanceTitle">
   <div class="appearance-heading"><h2 id="appearanceTitle">界面设置</h2><button type="button" data-close-appearance aria-label="关闭界面设置">×</button></div>
   <p class="appearance-intro">为你的阅读习惯调整工作台。设置即时生效，自动保存在当前浏览器，不影响检测参数。</p>
-  <fieldset><legend>选择主题</legend><div class="theme-options"><label class="theme-choice"><input type="radio" name="theme" value="porcelain"><span><span class="theme-swatches"><i style="background:#f4f7fb"></i><i style="background:#326aac"></i><i style="background:#20354b"></i></span><b>月白蓝</b></span><small>清透白底 · 克制蓝色</small></label><label class="theme-choice"><input type="radio" name="theme" value="jade"><span><span class="theme-swatches"><i style="background:#f1f7f4"></i><i style="background:#277867"></i><i style="background:#1e3e35"></i></span><b>青瓷绿</b></span><small>柔和青绿 · 久读舒适</small></label><label class="theme-choice"><input type="radio" name="theme" value="paper"><span><span class="theme-swatches"><i style="background:#faf7f0"></i><i style="background:#8b642d"></i><i style="background:#40392b"></i></span><b>暖纸金</b></span><small>温暖纸色 · 简洁沉静</small></label><label class="theme-choice"><input type="radio" name="theme" value="harbor"><span><span class="theme-swatches"><i style="background:#131f30"></i><i style="background:#8cdae6"></i><i style="background:#e6f0fc"></i></span><b>科研港夜色</b></span><small>深蓝背景 · 清晰冷光</small></label><label class="theme-choice"><input type="radio" name="theme" value="system"><span><span class="theme-swatches"><i style="background:#f4f7fb"></i><i style="background:#131f30"></i><i style="background:#326aac"></i></span><b>跟随系统</b></span><small>根据设备外观切换明暗</small></label></div></fieldset>
+  <fieldset><legend>选择主题</legend><div class="theme-options"><label class="theme-choice"><input type="radio" name="theme" value="porcelain"><span><span class="theme-swatches"><i style="background:#c8d5e4"></i><i style="background:#326aac"></i><i style="background:#20354b"></i></span><b>雾蓝灰</b></span><small>柔和蓝灰 · 清晰背景</small></label><label class="theme-choice"><input type="radio" name="theme" value="jade"><span><span class="theme-swatches"><i style="background:#f1f7f4"></i><i style="background:#277867"></i><i style="background:#1e3e35"></i></span><b>青瓷绿</b></span><small>柔和青绿 · 久读舒适</small></label><label class="theme-choice"><input type="radio" name="theme" value="paper"><span><span class="theme-swatches"><i style="background:#faf7f0"></i><i style="background:#8b642d"></i><i style="background:#40392b"></i></span><b>暖纸金</b></span><small>温暖纸色 · 简洁沉静</small></label><label class="theme-choice"><input type="radio" name="theme" value="harbor"><span><span class="theme-swatches"><i style="background:#131f30"></i><i style="background:#8cdae6"></i><i style="background:#e6f0fc"></i></span><b>科研港夜色</b></span><small>深蓝背景 · 清晰冷光</small></label><label class="theme-choice"><input type="radio" name="theme" value="system"><span><span class="theme-swatches"><i style="background:#c8d5e4"></i><i style="background:#131f30"></i><i style="background:#326aac"></i></span><b>跟随系统</b></span><small>根据设备外观切换明暗</small></label></div></fieldset>
   <fieldset><legend>阅读与布局</legend><div class="appearance-controls">
     <label><span class="control-title">字号<output id="appearanceSizeValue">16 px</output></span><input type="range" name="size" min="15" max="20" step="1" aria-label="界面字号"></label>
     <label><span class="control-title">行距<output id="appearanceLeadingValue">1.8</output></span><input type="range" name="leading" min="1.5" max="2.2" step="0.1" aria-label="阅读行距"></label>
     <label>正文字体<select name="font"><option value="sans">清晰黑体</option><option value="serif">书卷宋体</option></select></label>
     <label>内容宽度<select name="width"><option value="focus">专注 · 窄版</option><option value="standard">标准 · 均衡</option><option value="wide">宽屏 · 展开</option></select></label>
     <label>信息密度<select name="density"><option value="comfortable">舒适留白</option><option value="compact">紧凑布局</option></select></label>
-    <label><span class="control-title">背景强度<output id="appearanceBackgroundValue">12%</output></span><input type="range" name="background" min="0" max="35" step="1" aria-label="背景强度"></label>
+    <label><span class="control-title">背景强度<output id="appearanceBackgroundValue">62%</output></span><input type="range" name="background" min="0" max="100" step="1" aria-label="背景强度"></label>
   </div></fieldset>
   <div class="appearance-checks"><label><input type="checkbox" name="contrast">增强文字对比</label><label><input type="checkbox" name="motion">减少动效</label></div>
   <p class="appearance-status" role="status" aria-live="polite"></p>
