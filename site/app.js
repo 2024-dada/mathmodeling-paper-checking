@@ -10,7 +10,7 @@ const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d) + "%";
 const ALLOWED = /\.(pdf|docx|txt|md|tex)$/i;
 const files = { papers: [], corpus: [], exclude: [] };
 const CAT_COLOR = { disclaimer: "#ff3c8e", contrast: "#ffb000", limitation: "#8f5cff", scope: "#2de2e6", hedge: "#5cf2a6" };
-let mode = "", LEX = null, last = null;
+let mode = "none", LEX = null, last = null;
 
 const store = { get(k) { try { return localStorage.getItem(k) } catch (e) { return null } }, set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch (e) { } } };
 function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 1800); }
@@ -100,9 +100,9 @@ function render() {
     z.querySelector(".empty").style.display = files[g].length ? "none" : "";
     box.querySelectorAll(".x").forEach(b => b.onclick = e => { e.stopPropagation(); if (blocked()) return; files[g].splice(+b.dataset.i, 1); render(); });
   });
-  const ok = files.papers.length > 0, busy = $("#run").dataset.busy === "1";
+  const ok = files.papers.length > 0 && !!document.querySelector("#mode input:checked"), busy = $("#run").dataset.busy === "1";
   $("#run").disabled = !ok || busy;
-  if (!busy) { $("#log").style.color = ""; $("#log").textContent = ok ? `已放入 ${files.papers.length} 篇被测论文${files.corpus.length ? `、${files.corpus.length} 篇比对库` : ""}` : "先放入至少一篇被测论文"; }
+  if (!busy) { $("#log").style.color = ""; $("#log").textContent = ok ? `已放入 ${files.papers.length} 篇被测论文${files.corpus.length ? `、${files.corpus.length} 篇比对库` : ""}` : files.papers.length ? "请勾选至少一个检查方面" : "先放入至少一篇被测论文"; }
 }
 async function entriesToFiles(items) {
   const out = [];
@@ -165,6 +165,11 @@ drawGauge();
 document.querySelectorAll("#mode button").forEach(b => b.onclick = () => {
   document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b)); mode = b.dataset.v;
 });
+document.querySelectorAll("#mode input").forEach(input => input.onchange = () => {
+  const selected = [...document.querySelectorAll("#mode input:checked")].map(x => x.dataset.check);
+  mode = selected.includes("dup") ? (selected.includes("def") ? "" : "dup") : selected.includes("def") ? "def" : "none";
+  render();
+});
 $("#para").oninput = e => $("#paraV").textContent = (+e.target.value).toFixed(2);
 
 /* ---------------- 下拉选择 ---------------- */
@@ -221,7 +226,46 @@ $("#oEmbed").onchange = e => e.target._touched = true;
 
 /* ---------------- 余额与消耗 ---------------- */
 let provider = null, balance = null, balBusy = false, lastBalAt = 0, balancePromise = null;
-let billingTimers = [], billingGeneration = 0, billingOwner = "";
+let billingTimers = [], billingGeneration = 0, billingOwner = "", billingBaseline = null;
+let billingStorageKey = null, billingStorageOwner = "";
+async function restoreBilling(account) {
+  if (billingStorageOwner === account) return;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(account));
+  const storageKey = "papersim-billing-" + [...new Uint8Array(digest)].map(x => x.toString(16).padStart(2, "0")).join("");
+  if (account !== billingIdentity()) return;
+  billingStorageOwner = account; billingStorageKey = storageKey;
+  billingBaseline = null; costByBalance = null; billingOwner = account;
+  let saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem(storageKey)); } catch { }
+  const validBalance = b => b && typeof b.currency === "string" && [b.amount, b.used].some(Number.isFinite);
+  const validUsage = u => u && ["calls", "input", "output", "cached", "embed"].every(k => Number.isFinite(u[k]) && u[k] >= 0);
+  if (validBalance(saved?.baseline) && validUsage(saved?.usage)) {
+    billingBaseline = saved.baseline; usage = saved.usage;
+  } else usage = { calls: 0, input: 0, output: 0, cached: 0, embed: 0 };
+}
+function saveBilling() {
+  if (!billingStorageKey || billingStorageOwner !== billingIdentity()) return;
+  try {
+    if (billingBaseline) sessionStorage.setItem(billingStorageKey, JSON.stringify({ baseline: billingBaseline, usage }));
+    else sessionStorage.removeItem(billingStorageKey);
+  } catch { }
+}
+function beginBilling(before) {
+  if (!billingBaseline && before && (Number.isFinite(before.amount) || Number.isFinite(before.used))) {
+    billingBaseline = { amount: before.amount, used: before.used, currency: before.currency };
+    billingOwner = billingIdentity(); saveBilling();
+  }
+}
+function reconcileBalance(current) {
+  if (!billingBaseline || billingOwner !== billingIdentity() || billingBaseline.currency !== current.currency) return;
+  const delta = Number.isFinite(billingBaseline.amount) && Number.isFinite(current.amount) ? billingBaseline.amount - current.amount
+    : Number.isFinite(billingBaseline.used) && Number.isFinite(current.used) ? current.used - billingBaseline.used : null;
+  if (delta != null) costByBalance = delta >= 0 ? { amount: Math.round(delta * 1e8) / 1e8, currency: current.currency } : null;
+  showUsage(usage);
+  if (delta < 0) $("#costS").textContent = "余额增加或发生充值，无法直接按余额差核算；请参考服务商账单";
+  else if (delta === 0 && usage.calls) $("#costS").textContent = "余额尚未变化，正在自动复查延迟扣费；也可随时点刷新";
+  snapshotAccount();
+}
 const billingIdentity = () => `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`;
 const SYM = { CNY: "¥", USD: "$" };
 const money = (x, cur) => x == null || isNaN(x) ? "—" : `${SYM[cur] || ""}${Math.abs(x) < 1 ? x.toFixed(4) : x.toFixed(2)}`;
@@ -229,6 +273,7 @@ async function refreshBalance(quiet = false) {
   const key = $("#key").value.trim();
   if (!key || !provider) { $("#balV").textContent = "—"; $("#balS").textContent = "填好 key 后自动查询"; return null; }
   if (!E.balanceSupported(provider)) { $("#balV").textContent = "—"; $("#balS").textContent = "该服务商没有公开的余额查询接口，请在官网控制台查看"; return null; }
+  await restoreBilling(billingIdentity());
   if (balancePromise) { await balancePromise; return refreshBalance(quiet); }
   balBusy = true; if (!quiet) $("#balS").textContent = "查询中…";
   const account = `${provider}|${$("#base").value.trim()}|${key}`;
@@ -243,7 +288,7 @@ async function refreshBalance(quiet = false) {
     balance = r;
     $("#balV").textContent = r.amount != null ? money(r.amount, r.currency) : `已用 ${money(r.used, r.currency)}`;
     $("#balS").textContent = `${r.detail} · ${new Date(r.at).toLocaleTimeString()}`;
-    snapshotAccount(); return r;
+    showUsage(usage); reconcileBalance(r); snapshotAccount(); return r;
   }
   $("#balV").textContent = "—"; $("#balS").textContent = r.reason + (!E.net.proxied && /浏览器/.test(r.reason) ? "（本地版可查）" : "");
   snapshotAccount(); return null;
@@ -270,10 +315,10 @@ function showUsage(u) {
   usage = u;
   $("#useS").textContent = `${u.calls} 次调用 · 输入 ${fmtN(u.input)} · 输出 ${fmtN(u.output)} tokens` + (u.cached ? ` · 缓存命中 ${fmtN(u.cached)}` : "") + (u.embed ? ` · 向量 ${fmtN(u.embed)}` : "");
   const est = estimate(u), cur = $("#pCur").value;
-  if (costByBalance) { $("#costV").textContent = money(costByBalance.amount, costByBalance.currency); $("#costS").textContent = "按运行前后的余额差计算" + (est != null ? ` · 按单价估算 ${money(est, cur)}` : ""); }
+  if (costByBalance) { $("#costV").textContent = money(costByBalance.amount, costByBalance.currency); $("#costS").textContent = "按本轮检测开始以来的余额差计算（含续聊）" + (est != null ? ` · 按单价估算 ${money(est, cur)}` : ""); }
   else if (est != null) { $("#costV").textContent = "≈ " + money(est, cur); $("#costS").textContent = "按你填的单价估算"; }
   else if (u.calls) { $("#costV").textContent = "—"; $("#costS").textContent = "在“服务商、地址与单价”里填写单价即可估算金额"; }
-  snapshotAccount();
+  saveBilling(); snapshotAccount();
   if (detecting && u.calls && Date.now() - lastBalAt > 8000 && balance) refreshBalance(true);   // 运行中顺带刷新余额
 }
 
@@ -282,21 +327,16 @@ function snapshotAccount() {
 }
 function stopBillingPolls() { billingGeneration++; billingTimers.forEach(clearTimeout); billingTimers = []; }
 async function settleBilling(before, previousCost, generation) {
-  const account = `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`;
+  beginBilling(before);
+  const account = billingIdentity();
   const update = async () => {
-    if (generation !== billingGeneration || account !== `${provider}|${$("#base").value.trim()}|${$("#key").value.trim()}`) return;
-    const after = await refreshBalance(true);
+    if (generation !== billingGeneration || account !== billingIdentity()) return;
+    await refreshBalance(true);
     if (generation !== billingGeneration) return;
-    if (before && after && before.currency === after.currency) {
-      const delta = before.amount != null && after.amount != null ? before.amount - after.amount : after.used != null && before.used != null ? after.used - before.used : null;
-      if (delta != null && delta >= 0) {
-        costByBalance = { amount: delta + (previousCost?.currency === after.currency ? previousCost.amount : 0), currency: after.currency };
-      }
-    }
-    showUsage(usage); snapshotAccount();
+    snapshotAccount();
   };
   await update();
-  if (E.balanceSupported(provider)) for (const delay of [2000, 5000, 10000]) billingTimers.push(setTimeout(() => update().catch(e => { $("#balS").textContent = "自动更新余额失败：" + e.message; snapshotAccount(); }), delay));
+  if (E.balanceSupported(provider)) for (const delay of [2000, 5000, 10000, 20000, 40000, 60000, 90000, 120000]) billingTimers.push(setTimeout(() => update().catch(e => { $("#balS").textContent = "自动更新余额失败：" + e.message; snapshotAccount(); }), delay));
 }
 
 /* ---------------- API 识别 ---------------- */
@@ -362,18 +402,21 @@ chat.disable(); embed.disable(); syncOpts();
 /* ---------------- 运行 ---------------- */
 $("#run").onclick = async () => {
   if (blocked() || !files.papers.length) return;
+  const selected = [...document.querySelectorAll("#mode input:checked")].map(x => x.dataset.check);
+  if (!selected.length) { toast("请至少勾选一个检查方面"); return; }
+  if ((selected.includes("logic") || selected.includes("hallucination")) && (!chat.value || !$("#key").value.trim())) { toast("逻辑与幻觉风险检查需要填写 API Key 并选择对话模型"); return; }
   const btn = $("#run"), log = $("#log");
-  stopBillingPolls(); billingOwner = billingIdentity();
+  stopBillingPolls(); billingOwner = billingIdentity(); billingBaseline = null; saveBilling();
   last = null;
   $("#dlPdf").disabled = true;
   $("#runSummary").innerHTML = '<h3>检测进行中</h3><p>本次完成后更新参数与结果。</p>';
   $("#papers").innerHTML = "";
   const settings = { mode: mode || "全部", level, threshold: +$("#para").value,
     embedText: $("#embedText").checked, model: chat.value || "未使用",
-    review: $("#oReview").checked && !$("#oReview").disabled,
-    semantic: $("#oEmbed").checked && !$("#oEmbed").disabled,
+    review: selected.includes("def") && $("#oReview").checked && !$("#oReview").disabled,
+    semantic: selected.includes("dup") && $("#oEmbed").checked && !$("#oEmbed").disabled,
     apply: $("#oApply").checked && !$("#oApply").disabled,
-    corpus: files.corpus.length, exclude: files.exclude.length };
+    corpus: files.corpus.length, exclude: files.exclude.length, logic: selected.includes("logic"), hallucination: selected.includes("hallucination") };
   const configuredClient = client();
   costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
   $("#costV").textContent = "—"; $("#costS").textContent = "本次尚未产生 API 消耗";
@@ -396,18 +439,19 @@ $("#run").onclick = async () => {
       setProgress(3 + 27 * (i + 1) / all.length, `已读取 ${i + 1}/${all.length} 个文件`);
     }
     for (const d of got.papers) if (d.sentences.length < 3) toast(`${d.name} 几乎没抽出文字，可能是扫描版 PDF`);
-    useLLM = configuredClient && (settings.review || settings.apply || settings.semantic);
+    useLLM = configuredClient && (settings.review || settings.apply || settings.semantic || settings.logic || settings.hallucination);
     if (useLLM) {
       costByBalance = null;
       $("#costV").textContent = "…"; $("#costS").textContent = "运行中，实时统计";
       before = await refreshBalance(true);
+      beginBilling(before);
     }
     const res = await E.run({
       docs: got.papers, corpus: got.corpus, exclude: got.exclude, lex, client: useLLM ? configuredClient : null, log: say, progress: (done, total) => setProgress(30 + 60 * done / total),
       opt: {
         only: settings.mode === "全部" ? null : settings.mode, paraThreshold: settings.threshold, level: settings.level,
         embedText: settings.embedText, llmReview: settings.review,
-        llmEmbed: settings.semantic, apply: settings.apply,
+        llmEmbed: settings.semantic, apply: settings.apply, logic: settings.logic, hallucination: settings.hallucination,
       }
     });
     setProgress(92, "正在整理检测结果…");
@@ -471,7 +515,7 @@ function paperCard(r, k) {
   const tabs = [["prompt", "优化提示词"], ...(sg ? [["sug", "AI 修改建议"]] : []), ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
   return `<section class="card paper" data-k="${k}">
     <h3>${esc(doc.name)}</h3><div class="revision">${r.revisions?.[k] ? `已完成 ${r.revisions[k]} 轮继续优化 · 指标已按修订正文重算` : "初次检测结果"}</div><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
-    <div class="metrics">${dupBox}${defBox}</div>
+    <div class="metrics">${dupBox}${defBox}</div>${auditPanel(r.audits?.[k])}
     <div class="recommendations"><h4>修改建议</h4><ul>${advice(r, k).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
     <div class="tabs">${tabs.map(([id, t], i) => `<button data-t="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div>
     <div class="pane on" data-p="prompt"><div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
@@ -487,6 +531,10 @@ function paperCard(r, k) {
     <button class="btn primary followup-send">继续优化并更新结果</button><p class="followup-status" role="status"></p></section>
   </section>`;
 }
+function auditPanel(audit) {
+  if (!audit) return "";
+  return `<section class="paper-audits">${[["logic", "论文逻辑检查"], ["hallucination", "幻觉风险 · 待核实"]].filter(([key]) => audit[key] !== null).map(([key, label]) => `<h4>${label}</h4><p class="hint">${key === "hallucination" ? "依据论文内容提出核查线索，未联网核实；不能据此断定事实或文献虚假。" : "模型提出的逻辑疑点，需要作者结合公式、数据与上下文复核。"}</p>${audit[key].length ? audit[key].map(item => `<article class="sent"><div class="t">${({high:"优先核查",medium:"建议核查",low:"补充说明"})[item.severity]} · ${esc(item.status)}</div><blockquote>${esc(item.quote)}</blockquote><p>${esc(item.issue)}</p><p><b>建议：</b>${esc(item.suggestion)}</p></article>`).join("") : '<p class="none">未发现能定位到原文的风险项；不代表已完成正确性验证。</p>'}`).join("")}${audit.rejected ? `<p class="hint">模型另有 ${audit.rejected} 条输出无法定位原文或缺少必要信息，未作为检查结论。</p>` : ""}</section>`;
+}
 function advice(r, k) {
   const a = [], d = r.dup[k], f = r.dfn[k];
   if (d?.total > 0) a.push("优先核对下方重复高亮与来源，为引用补充标注，并用自己的论证说明模型选择。");
@@ -501,11 +549,11 @@ function summaryPanel(r) {
   const s = r.settings;
   return `<h3>本次检测参数</h3><dl class="summary-grid">${Object.entries({
     "被测论文": r.docs.length + " 篇", "比对库": s.corpus + " 篇", "赛题原文": s.exclude + " 篇",
-    "检测内容": ({dup:"重复率",def:"防御性语言"})[s.mode] || "全部", "防御率挡位": s.level,
+    "检测内容": ({dup:"重复率",def:"防御性语言",none:"仅模型专项检查"})[s.mode] || "全部", "防御率挡位": s.level,
     "摘要 / 正文目标": r.targets.map(x => pct(x,0)).join(" / "), "改写相似阈值": s.threshold,
     "提示词附全文": s.embedText ? "是" : "否", "对话模型": s.model,
     "防御句复核": s.review ? "开启" : "关闭", "语义检测": s.semantic ? "开启" : "关闭",
-    "模型修改建议": s.apply ? "开启" : "关闭", "累计继续优化": (r.revisions || []).reduce((a,b) => a+b,0) + " 轮"
+    "模型修改建议": s.apply ? "开启" : "关闭", "论文逻辑检查": s.logic ? "勾选" : "未勾选", "幻觉风险检查": s.hallucination ? "勾选" : "未勾选", "累计继续优化": (r.revisions || []).reduce((a,b) => a+b,0) + " 轮"
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
 }
 function showResults(r) {
@@ -542,17 +590,17 @@ $("#dlPrompts").onclick = () => last && download(`papersim_提示词_${stamp()}.
 $("#dlCsv").onclick = () => {
   if (!last) return;
   const f4 = x => x == null ? "" : x.toFixed(4);
-  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "继续优化轮数"]];
+  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "继续优化轮数", "逻辑风险数", "待核实事实风险数"]];
   last.docs.forEach((d, i) => {
     const u = last.dup[i], f = last.dfn[i], top = u ? Object.entries(u.bySource)[0] || ["", 0] : ["", null];
     rows.push([d.name, d.nWords, d.sentences.length, f4(u?.total), f4(u?.exact), f4(u?.paraphrase), f4(u?.excluded), top[0], f4(top[1]),
-      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), last.revisions?.[i] || 0]);
+      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), last.revisions?.[i] || 0, last.audits?.[i]?.logic?.length ?? "", last.audits?.[i]?.hallucination?.length ?? ""]);
   });
   download(`papersim_${stamp()}.csv`, "﻿" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 };
 $("#dlJson").onclick = () => {
   if (!last) return;
-  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], settings: last.settings, advice: advice(last, i), prompt: last.prompts[i], suggestion: last.suggestions[i], conversation: last.conversations?.[i] || [], revision: last.revisions?.[i] || 0, usage: last.usage, account: last.accountText }));
+  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], audits: last.audits?.[i], settings: last.settings, advice: advice(last, i), prompt: last.prompts[i], suggestion: last.suggestions[i], conversation: last.conversations?.[i] || [], revision: last.revisions?.[i] || 0, usage: last.usage, account: last.accountText }));
   download(`papersim_${stamp()}.json`, JSON.stringify(out, null, 1), "application/json");
 };
 $("#dlReport").onclick = () => {
@@ -582,6 +630,10 @@ function pdfBlocks(r) {
     if (f) {
       blocks.push({ text: `防御性语言率 ${pct(f.rate)}；摘要 ${pct(f.summary)}；正文 ${pct(f.body)}；强度 ${f.intensity.toFixed(2)} 分/千词；大模型复核 ${pct(f.llmRate)}` });
       Object.entries(f.byCategory).forEach(([key, rate]) => blocks.push({ text: `${r.lex.categories[key].label}：${pct(rate)}` }));
+    }
+    for (const [kind, label] of [["logic", "论文逻辑检查"], ["hallucination", "幻觉风险检查 · 未联网核实"]]) {
+      const items = r.audits?.[i]?.[kind];
+      if (items) { blocks.push({ heading: true, text: label }); if (!items.length) blocks.push({ text: "未发现可定位风险，不代表已验证正确性。" }); items.forEach(item => blocks.push({ text: `原文：${item.quote}\n疑点：${item.issue}\n建议：${item.suggestion}（${item.status}）` })); }
     }
     blocks.push({ heading: true, text: "修改建议" });
     advice(r, i).forEach(text => blocks.push({ text }));
@@ -621,6 +673,8 @@ async function continuePaper(r, k, card) {
   if (blocked() || r !== last) return;
   const request = card.querySelector(".followup-input").value.trim(), notice = card.querySelector(".followup-status");
   if (!request) { notice.textContent = "请先填写本轮优化要求"; return; }
+  await restoreBilling(billingIdentity());
+  if (blocked() || r !== last) return;
   const c = client();
   if (!c || !$("#key").value.trim()) { notice.textContent = "请先在上方填写 API Key 并选择对话模型"; return; }
   if (billingOwner !== billingIdentity()) { billingOwner = billingIdentity(); costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 }); }
@@ -632,6 +686,7 @@ async function continuePaper(r, k, card) {
   $("#run").textContent = "继续优化中…"; setProgress(5, "准备本轮对话与论文内容…");
   try {
     before = await refreshBalance(true);
+    beginBilling(before);
     const turns = r.conversations?.[k] || [];
     const messages = [{ role: "system", content: '你是论文写作编辑。保留原文数字、公式、引用、事实和结论方向，不编造数据或文献；保留必要假设与学术诚信披露。遵循用户的本轮修改要求。只返回 JSON 对象，必须包含 revisedText（完整修订论文纯文本，不是摘要或局部片段）与 suggestion（修改说明与尚待作者核实的项目）。不可自行宣称检测分数，指标由本地引擎重算。' },
       ...turns.flatMap(t => [{ role: "user", content: t.request }, { role: "assistant", content: t.suggestion }]),
@@ -641,8 +696,8 @@ async function continuePaper(r, k, card) {
     if (typeof answer.revisedText !== "string" || !answer.revisedText.trim() || typeof answer.suggestion !== "string" || !answer.suggestion.trim()) throw new Error("模型未返回完整修订正文与修改说明，当前结果已保留，请重试或调整要求");
     setProgress(60, "修订正文已生成，正在重算全部论文指标…");
     const docs = [...r.docs]; docs[k] = E.makeDocument(answer.revisedText, r.docs[k].name, false, true);
-    const computed = await E.run({ docs, corpus: r.corpusDocs, exclude: r.excludeDocs, lex: r.lex,
-      opt: { only: r.settings.mode === "全部" ? null : r.settings.mode, paraThreshold: r.settings.threshold, level: r.settings.level, embedText: r.settings.embedText },
+    const computed = await E.run({ docs, corpus: r.corpusDocs, exclude: r.excludeDocs, lex: r.lex, client: c,
+      opt: { only: r.settings.mode === "全部" ? null : r.settings.mode, paraThreshold: r.settings.threshold, level: r.settings.level, embedText: r.settings.embedText, logic: r.settings.logic, hallucination: r.settings.hallucination },
       log: async text => { setProgress(progressValue, text); await tick(); }, progress: (n, total) => setProgress(60 + 30 * n / total) });
     const conversations = (r.conversations || r.docs.map(() => [])).map(x => [...x]), revisions = [...(r.revisions || r.docs.map(() => 0))];
     conversations[k].push({ request, suggestion: answer.suggestion, model: c.model }); revisions[k]++;

@@ -36,3 +36,5 @@ input[type=text],input[type=password],input[type=number],select,textarea,.combo 
 
 :root[data-theme=harbor] .veil{background:linear-gradient(90deg,rgba(12,24,39,.48),rgba(12,24,39,.1))}.card{backdrop-filter:blur(14px)}.workspace-nav{backdrop-filter:blur(18px)}.appearance-dialog{background:color-mix(in srgb,var(--panel) 95%,var(--night))}
 header{background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:20px}
+
+.inspection-options{display:grid;gap:14px;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--field)}.paper-audits{margin:24px 0}.paper-audits h4{font-size:1em;margin:20px 0 10px}.paper-audits blockquote{margin:10px 0;padding-left:12px;border-left:2px solid var(--line2);color:var(--ink2);white-space:pre-wrap}.paper-audits .sent p{white-space:pre-wrap}

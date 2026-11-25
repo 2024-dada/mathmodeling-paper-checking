@@ -605,16 +605,36 @@ export class Client {
   }
 }
 
+export async function reviewPaper(doc, client, { logic = false, hallucination = false } = {}) {
+  const kinds = [logic && "logic", hallucination && "hallucination"].filter(Boolean);
+  const result = await client.chatJSON(`你是论文审阅者，只检查指定项目：${kinds.join("、")}。
+logic：前提与结论脱节、因果跳跃、公式或单位不一致、约束遗漏、论证自相矛盾。
+hallucination：无出处数据、引文与正文不符、缺乏证据的事实断言等待核实风险。你没有联网查证能力，不得声称已证实任何数据、文献或事实为真或为假，不得编造外部来源。
+只返回 JSON，结构为 {"logic":[],"hallucination":[]}。每条必须包含 quote（从论文逐字摘录的连续原文）、issue（具体疑点，区分推断与确定事实）、suggestion（可执行的核查或修改建议）、severity（high/medium/low）。没有可定位问题则返回空数组。不要输出 AI 生成率或作者模型身份推断。
+论文：\n${doc.text}`);
+  if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("专项检查返回格式无效，请重试");
+  const out = { logic: null, hallucination: null, rejected: 0 };
+  for (const kind of kinds) {
+    if (!Array.isArray(result[kind])) throw new Error("专项检查返回格式无效，请重试");
+    out[kind] = [];
+    for (const item of result[kind]) {
+      if (!item || typeof item.quote !== "string" || !item.quote.trim() || !doc.text.includes(item.quote) || typeof item.issue !== "string" || !item.issue.trim() || typeof item.suggestion !== "string" || !item.suggestion.trim()) { out.rejected++; continue; }
+      out[kind].push({ quote: item.quote, issue: item.issue, suggestion: item.suggestion, severity: ["high","medium","low"].includes(item.severity) ? item.severity : "medium", status: kind === "hallucination" ? "待外部核实" : "待作者复核" });
+    }
+  }
+  return out;
+}
+
 /* ============================== 总流程 ============================== */
 export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, client = null, log = () => {}, progress = () => {} }) {
   const k = docs.length;
-  if (opt.only !== "def" && docs.length + corpus.length < 2) throw new Error("重复率至少需要两篇（被测论文 + 比对库）。只测防御性语言请选“只看防御性语言”");
+  if (!["def", "none"].includes(opt.only) && docs.length + corpus.length < 2) throw new Error("重复率至少需要两篇（被测论文 + 比对库）。只测防御性语言请选“只看防御性语言”");
   if (opt.threshold != null) lex.threshold = opt.threshold;
-  let dup = Array(k).fill(null), dfn = Array(k).fill(null);
-  const total = k * (1 + (opt.only !== "def" ? 1 : 0) + (opt.only !== "dup" ? 1 : 0) + (opt.only !== "dup" && client && opt.llmReview ? 1 : 0) + (client && opt.apply ? 1 : 0));
+  let dup = Array(k).fill(null), dfn = Array(k).fill(null), audits = Array(k).fill(null);
+  const total = k * (1 + (!["def", "none"].includes(opt.only) ? 1 : 0) + (!["dup", "none"].includes(opt.only) ? 1 : 0) + (!["dup", "none"].includes(opt.only) && client && opt.llmReview ? 1 : 0) + (client && opt.apply ? 1 : 0) + (opt.logic || opt.hallucination ? 1 : 0));
   let done = 0;
   const advance = () => progress(++done, total);
-  if (opt.only !== "def") {
+  if (!["def", "none"].includes(opt.only)) {
     await log("计算重复率…");
     const embedFn = client && opt.llmEmbed && client.embedModel ? t => client.embed(t) : null;
     for (let i = 0; i < k; i++) {
@@ -622,14 +642,23 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
       dup[i] = await checkDup(docs[i], docs.filter((_, j) => j !== i).concat(corpus), exclude, { paraThreshold: opt.paraThreshold ?? 0.6, embedFn }); advance();
     }
   }
-  if (opt.only !== "dup") {
+  if (!["dup", "none"].includes(opt.only)) {
     for (let i = 0; i < k; i++) { await log(`计算防御性语言 ${i + 1}/${k}：${docs[i].name}`); dfn[i] = analyzeDef(docs[i], lex); advance(); }
     if (client && opt.llmReview) for (let i = 0; i < k; i++) { await log(`大模型复核防御句 ${i + 1}/${k}：${docs[i].name}`); await llmReview(docs[i], dfn[i], client); advance(); }
+  }
+  if (opt.logic || opt.hallucination) {
+    if (!client) throw new Error("逻辑与幻觉风险检查需要对话模型");
+    for (let i = 0; i < k; i++) { await log(`论文专项检查 ${i + 1}/${k}：${docs[i].name}`); audits[i] = await reviewPaper(docs[i], client, opt); advance(); }
   }
   await log("生成优化提示词…");
   const prompts = [], suggestions = [];
   for (let i = 0; i < k; i++) {
     prompts.push(buildPrompt(docs[i], dup[i], dfn[i], lex, { level: opt.level ?? null, targetSummary: opt.targetSummary ?? 0.1, targetBody: opt.targetBody ?? 0.08, embedText: !!opt.embedText }));
+    if (audits[i]) {
+      const notes = ["\n\n## 专项检查待复核清单（风险提示，不是真伪鉴定）"];
+      for (const kind of ["logic", "hallucination"]) for (const item of audits[i][kind] || []) notes.push(`- 原文：${item.quote}\n疑点：${item.issue}\n建议：${item.suggestion}（${item.status}）`);
+      prompts[i] += notes.join("\n");
+    }
     advance();
     if (client && opt.apply) {
       await log(`大模型生成修改建议 ${i + 1}/${k}：${docs[i].name}`);
@@ -638,5 +667,5 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
     } else suggestions.push(null);
   }
   await log("检测计算完成，正在整理报告…");
-  return { docs, dup, dfn, prompts, suggestions };
+  return { docs, dup, dfn, audits, prompts, suggestions };
 }
