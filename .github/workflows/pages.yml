@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -17,6 +18,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,5 +31,23 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+          name: ${{ env.ARTIFACT_NAME }}
+      - name: 等待发布包可用
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if artifacts=$(curl --fail --silent --show-error --max-time 15               -H "Authorization: Bearer $GH_TOKEN"               -H "Accept: application/vnd.github+json"               "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$ARTIFACT_NAME"); then
+              if jq -e --arg name "$ARTIFACT_NAME" 'any(.artifacts[]; .name == $name and .expired == false)' <<< "$artifacts" > /dev/null; then
+                exit 0
+              fi
+            fi
+            sleep 3
+          done
+          echo "发布包尚未可用，请稍后重试。" >&2
+          exit 1
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ env.ARTIFACT_NAME }}
