@@ -19,6 +19,26 @@ import numpy as np
 from .providers import auth_headers
 
 
+def parse_json_loose(text):
+    """从模型回复中取出 JSON：容忍前后说明文字、```json 代码块和 <think> 推理段。"""
+    t = re.sub(r"<think>.*?</think>", "", str(text or ""), flags=re.S | re.I).strip()
+    m = re.search(r"```(?:json)?\s*(.*?)```", t, re.S | re.I)
+    if m:
+        t = m.group(1).strip()
+    try:
+        return json.loads(t)
+    except ValueError:
+        pass
+    dec = json.JSONDecoder()
+    for i, c in enumerate(t):
+        if c in "{[":
+            try:
+                return dec.raw_decode(t[i:])[0]
+            except ValueError:
+                continue
+    raise ValueError("模型返回的内容不是合法 JSON")
+
+
 class LLMClient:
     def __init__(self, api_key=None, base_url=None, model=None, embed_model=None, timeout=180):
         self.api_key = api_key or os.environ.get("PAPERSIM_API_KEY")
@@ -56,9 +76,7 @@ class LLMClient:
                 out = self._post("/chat/completions", body)
             else:
                 raise
-        txt = out["choices"][0]["message"]["content"].strip()
-        txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt)
-        return json.loads(txt)
+        return parse_json_loose(out["choices"][0]["message"]["content"])
 
     def chat_text(self, prompt):
         body = {"model": self.model, "temperature": 0.3, "messages": [{"role": "user", "content": prompt}]}

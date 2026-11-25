@@ -417,6 +417,26 @@ export function buildPrompt(doc, dup, dfn, lex, { level = null, targetSummary = 
 }
 
 /* ============================== API ============================== */
+// 从模型回复中取出 JSON：容忍前后说明文字、```json 代码块和推理模型的 <think> 段
+export function parseJSONLoose(text) {
+  let t = String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  try { return JSON.parse(t); } catch { }
+  for (const [open, close] of [["{", "}"], ["[", "]"]]) {
+    const a = t.indexOf(open);
+    if (a < 0) continue;
+    let depth = 0, inStr = false, esc = false;
+    for (let i = a; i < t.length; i++) {
+      const c = t[i];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === open) depth++;
+      else if (c === close && --depth === 0) { try { return JSON.parse(t.slice(a, i + 1)); } catch { break; } }
+    }
+  }
+  throw new Error("模型返回的内容不是合法 JSON");
+}
 // 网络层可替换：在本地 papersim-web 下运行时改走本机转发，绕开浏览器跨域限制
 export const net = { fetch: (url, init) => fetch(url, init), proxied: false };
 export function useLocalProxy(endpoint = "/api/proxy") {
@@ -587,12 +607,24 @@ export class Client {
   }
   async chatMessagesJSON(messages) {
     const body = { model: this.model, temperature: 0, messages, response_format: { type: "json_object" } };
-    let out;
-    try { out = await this.post("/chat/completions", body); }
-    catch (e) { if (String(e.body || e.message).includes("response_format")) { delete body.response_format; out = await this.post("/chat/completions", body); } else throw e; }
-    this.track(out, "chat");
-    const txt = out.choices[0].message.content.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
-    return JSON.parse(txt);
+    const ask = async b => {
+      let out;
+      try { out = await this.post("/chat/completions", b); }
+      catch (e) {
+        // 部分服务商不支持 json 模式，去掉后重试
+        if (b.response_format && e.status === 400) { delete b.response_format; out = await this.post("/chat/completions", b); }
+        else throw e;
+      }
+      this.track(out, "chat");
+      return out.choices?.[0]?.message?.content ?? "";
+    };
+    let txt = await ask(body);
+    try { return parseJSONLoose(txt); }
+    catch (e) {
+      // 模型多写了说明文字或格式残缺：要求它只重发 JSON，最多一次
+      txt = await ask({ ...body, messages: [...messages, { role: "assistant", content: txt }, { role: "user", content: "上一条回复不是合法 JSON。请只输出同样内容的 JSON 对象，不要任何其他文字。" }] });
+      return parseJSONLoose(txt);
+    }
   }
   async embed(texts, batch = 64) {
     const vecs = [];
@@ -605,6 +637,27 @@ export class Client {
   }
 }
 
+// 归一化后在原文中定位引文：忽略空白、引号、破折号和大小写差异，返回原文中的对应片段
+const NORM_MAP = { "“": '"', "”": '"', "„": '"', "‘": "'", "’": "'", "—": "-", "–": "-", "−": "-", "，": ",", "：": ":", "；": ";", "（": "(", "）": ")" };
+function normWithMap(text) {
+  let out = "", map = [], space = false;
+  for (let i = 0; i < text.length; i++) {
+    let c = NORM_MAP[text[i]] ?? text[i];
+    if (/\s/.test(c)) { if (!space && out) { out += " "; map.push(i); } space = true; continue; }
+    space = false; out += c.toLowerCase(); map.push(i);
+  }
+  return [out.trimEnd(), map];
+}
+export function locateQuote(text, quote) {
+  if (!quote) return null;
+  if (text.includes(quote)) return quote;
+  const [nt, map] = normWithMap(text), [nq] = normWithMap(quote.trim().replace(/^["'“”‘’「『]+|["'“”‘’」』]+$/g, ""));
+  if (nq.length < 6) return null;
+  const at = nt.indexOf(nq);
+  if (at < 0) return null;
+  return text.slice(map[at], map[at + nq.length - 1] + 1);
+}
+
 export async function reviewPaper(doc, client, { logic = false, hallucination = false } = {}) {
   const kinds = [logic && "logic", hallucination && "hallucination"].filter(Boolean);
   const result = await client.chatJSON(`你是论文审阅者，只检查指定项目：${kinds.join("、")}。
@@ -615,11 +668,12 @@ hallucination：无出处数据、引文与正文不符、缺乏证据的事实�
   if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("专项检查返回格式无效，请重试");
   const out = { logic: null, hallucination: null, rejected: 0 };
   for (const kind of kinds) {
-    if (!Array.isArray(result[kind])) throw new Error("专项检查返回格式无效，请重试");
+    if (!Array.isArray(result[kind])) { out[kind] = []; out.error = "模型没有按要求返回检查结果"; continue; }
     out[kind] = [];
     for (const item of result[kind]) {
-      if (!item || typeof item.quote !== "string" || !item.quote.trim() || !doc.text.includes(item.quote) || typeof item.issue !== "string" || !item.issue.trim() || typeof item.suggestion !== "string" || !item.suggestion.trim()) { out.rejected++; continue; }
-      out[kind].push({ quote: item.quote, issue: item.issue, suggestion: item.suggestion, severity: ["high","medium","low"].includes(item.severity) ? item.severity : "medium", status: kind === "hallucination" ? "待外部核实" : "待作者复核" });
+      const quote = item && typeof item.quote === "string" ? locateQuote(doc.text, item.quote) : null;
+      if (!quote || typeof item.issue !== "string" || !item.issue.trim() || typeof item.suggestion !== "string" || !item.suggestion.trim()) { out.rejected++; continue; }
+      out[kind].push({ quote, issue: item.issue, suggestion: item.suggestion, severity: ["high","medium","low"].includes(item.severity) ? item.severity : "medium", status: kind === "hallucination" ? "待外部核实" : "待作者复核" });
     }
   }
   return out;
@@ -648,7 +702,16 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
   }
   if (opt.logic || opt.hallucination) {
     if (!client) throw new Error("逻辑与幻觉风险检查需要对话模型");
-    for (let i = 0; i < k; i++) { await log(`论文专项检查 ${i + 1}/${k}：${docs[i].name}`); audits[i] = await reviewPaper(docs[i], client, opt); advance(); }
+    for (let i = 0; i < k; i++) {
+      if (opt.reuseAudits && opt.reuseAudits[i] !== undefined) { audits[i] = opt.reuseAudits[i]; advance(); continue; }
+      await log(`论文专项检查 ${i + 1}/${k}：${docs[i].name}`);
+      try { audits[i] = await reviewPaper(docs[i], client, opt); }
+      catch (e) {
+        // 单篇专项检查失败不影响其他结果
+        audits[i] = { logic: opt.logic ? [] : null, hallucination: opt.hallucination ? [] : null, rejected: 0, error: e.message };
+      }
+      advance();
+    }
   }
   await log("生成优化提示词…");
   const prompts = [], suggestions = [];

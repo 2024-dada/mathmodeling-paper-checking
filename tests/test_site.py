@@ -66,7 +66,7 @@ def get(url):
 
 def test_serves_site(app):
     _, ct, b = get(app + "/")
-    assert "text/html" in ct and b'src="app.js"' in b
+    assert "text/html" in ct and b'src="app.js' in b
     _, ct, _ = get(app + "/engine.js")
     assert "javascript" in ct
     _, ct, _ = get(app + "/vendor/pdf.min.mjs")
@@ -86,3 +86,21 @@ def test_proxy_rejects_plain_http(app):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req) as r:
         assert "https" in json.load(r)["error"]
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="需要 node")
+def test_js_loose_json_and_quotes(tmp_path):
+    script = tmp_path / "t.mjs"
+    script.write_text(f"""
+import {{ parseJSONLoose, locateQuote }} from "{(ROOT / 'site/engine.js').as_uri()}";
+const doc = "The mixed system is fastest. The combined system finishes in 101 years.";
+console.log(JSON.stringify([
+  parseJSONLoose('好的：\\n```json\\n{{"a":[1]}}\\n```'),
+  parseJSONLoose('<think>{{x}}</think> {{"logic":[]}} 完'),
+  locateQuote(doc, "The mixed system is  fastest."),
+  locateQuote(doc, "“the combined system finishes in 101 years”"),
+  locateQuote(doc, "made up sentence that is absent"),
+]));
+""", encoding="utf-8")
+    out = json.loads(subprocess.run(["node", str(script)], capture_output=True, text=True, check=True).stdout)
+    assert out == [{"a": [1]}, {"logic": []}, "The mixed system is fastest.", "The combined system finishes in 101 years", None]

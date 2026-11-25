@@ -188,3 +188,11 @@ def test_proxy_forwards_to_api(app, mock_api):
     assert r["status"] == 200 and "deepseek-chat" in r["body"]
     r = post(app + "/api/proxy", {"url": mock_api + "/models", "headers": {"Authorization": "Bearer nope"}})
     assert r["status"] == 401
+
+
+def test_parse_json_loose():
+    from papersim.llm import parse_json_loose
+    assert parse_json_loose('好的：\n```json\n{"a": [1]}\n```') == {"a": [1]}
+    assert parse_json_loose('<think>{x}</think>结果 {"logic": []} 完') == {"logic": []}
+    with pytest.raises(ValueError):
+        parse_json_loose("没有 JSON")

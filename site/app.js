@@ -100,9 +100,17 @@ function render() {
     z.querySelector(".empty").style.display = files[g].length ? "none" : "";
     box.querySelectorAll(".x").forEach(b => b.onclick = e => { e.stopPropagation(); if (blocked()) return; files[g].splice(+b.dataset.i, 1); render(); });
   });
+  document.body.classList.toggle("has-files", files.papers.length > 0);
+  if (typeof updateChrome === "function") queueMicrotask(updateChrome);
   const ok = files.papers.length > 0 && !!document.querySelector("#mode input:checked"), busy = $("#run").dataset.busy === "1";
   $("#run").disabled = !ok || busy;
-  if (!busy) { $("#log").style.color = ""; $("#log").textContent = ok ? `已放入 ${files.papers.length} 篇被测论文${files.corpus.length ? `、${files.corpus.length} 篇比对库` : ""}` : files.papers.length ? "请勾选至少一个检查方面" : "先放入至少一篇被测论文"; }
+  if (!busy) {
+    $("#log").style.color = "";
+    const lonely = ok && document.querySelector('#mode input[data-check="dup"]:checked') && files.papers.length + files.corpus.length < 2;
+    $("#log").textContent = !ok ? (files.papers.length ? "请勾选至少一个检查项" : "先放入至少一篇被测论文")
+      : lonely ? "只有一篇论文：重复率需要再放一篇论文或比对库，也可以取消勾选“重复率”"
+      : `已放入 ${files.papers.length} 篇被测论文${files.corpus.length ? `、${files.corpus.length} 篇比对库` : ""}`;
+  }
 }
 async function entriesToFiles(items) {
   const out = [];
@@ -151,6 +159,7 @@ function drawGauge() {
   $("#lvName").textContent = `第 ${level} 挡 · ${lv.name}${level === E.DEFAULT_LEVEL ? "（推荐）" : ""}`;
   $("#lvTarget").textContent = `摘要 ≤ ${Math.round(lv.summary * 100)}%　正文 ≤ ${Math.round(lv.body * 100)}%`;
   $("#lvTone").textContent = lv.tone;
+  if (typeof updateChrome === "function") queueMicrotask(updateChrome);
 }
 $("#gauge").addEventListener("keydown", e => {
   if (detecting) return;
@@ -162,14 +171,19 @@ $("#gauge").addEventListener("keydown", e => {
 drawGauge();
 
 /* ---------------- 设置 ---------------- */
-document.querySelectorAll("#mode button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b)); mode = b.dataset.v;
-});
-document.querySelectorAll("#mode input").forEach(input => input.onchange = () => {
+// 检查项：首次默认勾选两项本地检查（不调用 API），之后记住上次的选择
+function syncMode() {
   const selected = [...document.querySelectorAll("#mode input:checked")].map(x => x.dataset.check);
   mode = selected.includes("dup") ? (selected.includes("def") ? "" : "dup") : selected.includes("def") ? "def" : "none";
-  render();
-});
+  store.set("ps_checks", selected.join(","));
+}
+{
+  const saved = store.get("ps_checks");
+  const want = saved == null ? ["dup", "def"] : saved.split(",").filter(Boolean);
+  document.querySelectorAll("#mode input").forEach(x => x.checked = want.includes(x.dataset.check));
+  syncMode();
+}
+document.querySelectorAll("#mode input").forEach(input => input.onchange = () => { syncMode(); render(); });
 $("#para").oninput = e => $("#paraV").textContent = (+e.target.value).toFixed(2);
 
 /* ---------------- 下拉选择 ---------------- */
@@ -342,7 +356,7 @@ async function settleBilling(before, previousCost, generation) {
 /* ---------------- API 识别 ---------------- */
 $("#prov").innerHTML = `<option value="">自动识别</option>` + Object.entries(E.PROVIDERS).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join("") + `<option value="custom">自定义地址</option>`;
 let seq = 0, timer = null;
-function status(kind, text) { $("#st").className = "status " + kind; $("#stT").textContent = text; }
+function status(kind, text) { $("#st").className = "status " + kind; $("#stT").textContent = text; queueMicrotask(updateChrome); }
 function showErr(t) { const e = $("#err"); e.textContent = t || ""; e.style.display = t ? "block" : "none"; }
 
 async function detectModels(autoOpen = true) {
@@ -405,6 +419,7 @@ $("#run").onclick = async () => {
   const selected = [...document.querySelectorAll("#mode input:checked")].map(x => x.dataset.check);
   if (!selected.length) { toast("请至少勾选一个检查方面"); return; }
   if ((selected.includes("logic") || selected.includes("hallucination")) && (!chat.value || !$("#key").value.trim())) { toast("逻辑与幻觉风险检查需要填写 API Key 并选择对话模型"); return; }
+  if (selected.includes("dup") && files.papers.length + files.corpus.length < 2) { toast("重复率至少需要两篇：再放一篇被测论文或比对库，或取消勾选“重复率”"); $("#log").textContent = "重复率至少需要两篇论文"; return; }
   const btn = $("#run"), log = $("#log");
   stopBillingPolls(); billingOwner = billingIdentity(); billingBaseline = null; saveBilling();
   last = null;
@@ -533,7 +548,7 @@ function paperCard(r, k) {
 }
 function auditPanel(audit) {
   if (!audit) return "";
-  return `<section class="paper-audits">${[["logic", "论文逻辑检查"], ["hallucination", "幻觉风险 · 待核实"]].filter(([key]) => audit[key] !== null).map(([key, label]) => `<h4>${label}</h4><p class="hint">${key === "hallucination" ? "依据论文内容提出核查线索，未联网核实；不能据此断定事实或文献虚假。" : "模型提出的逻辑疑点，需要作者结合公式、数据与上下文复核。"}</p>${audit[key].length ? audit[key].map(item => `<article class="sent"><div class="t">${({high:"优先核查",medium:"建议核查",low:"补充说明"})[item.severity]} · ${esc(item.status)}</div><blockquote>${esc(item.quote)}</blockquote><p>${esc(item.issue)}</p><p><b>建议：</b>${esc(item.suggestion)}</p></article>`).join("") : '<p class="none">未发现能定位到原文的风险项；不代表已完成正确性验证。</p>'}`).join("")}${audit.rejected ? `<p class="hint">模型另有 ${audit.rejected} 条输出无法定位原文或缺少必要信息，未作为检查结论。</p>` : ""}</section>`;
+  return `<section class="paper-audits">${audit.error ? `<p class="audit-error">专项检查没有完成：${esc(audit.error)}。其他检测结果不受影响，可稍后用“继续优化”重试。</p>` : ""}${[["logic", "论文逻辑检查"], ["hallucination", "幻觉风险 · 待核实"]].filter(([key]) => audit[key] !== null).map(([key, label]) => `<h4>${label}</h4><p class="hint">${key === "hallucination" ? "依据论文内容提出核查线索，未联网核实；不能据此断定事实或文献虚假。" : "模型提出的逻辑疑点，需要作者结合公式、数据与上下文复核。"}</p>${audit[key].length ? audit[key].map(item => `<article class="sent"><div class="t">${({high:"优先核查",medium:"建议核查",low:"补充说明"})[item.severity]} · ${esc(item.status)}</div><blockquote>${esc(item.quote)}</blockquote><p>${esc(item.issue)}</p><p><b>建议：</b>${esc(item.suggestion)}</p></article>`).join("") : '<p class="none">未发现能定位到原文的风险项；不代表已完成正确性验证。</p>'}`).join("")}${audit.rejected ? `<p class="hint">模型另有 ${audit.rejected} 条输出无法定位原文或缺少必要信息，未作为检查结论。</p>` : ""}</section>`;
 }
 function advice(r, k) {
   const a = [], d = r.dup[k], f = r.dfn[k];
@@ -697,11 +712,12 @@ async function continuePaper(r, k, card) {
     setProgress(60, "修订正文已生成，正在重算全部论文指标…");
     const docs = [...r.docs]; docs[k] = E.makeDocument(answer.revisedText, r.docs[k].name, false, true);
     const computed = await E.run({ docs, corpus: r.corpusDocs, exclude: r.excludeDocs, lex: r.lex, client: c,
-      opt: { only: r.settings.mode === "全部" ? null : r.settings.mode, paraThreshold: r.settings.threshold, level: r.settings.level, embedText: r.settings.embedText, logic: r.settings.logic, hallucination: r.settings.hallucination },
+      opt: { only: r.settings.mode === "全部" ? null : r.settings.mode, paraThreshold: r.settings.threshold, level: r.settings.level, embedText: r.settings.embedText, logic: r.settings.logic, hallucination: r.settings.hallucination,
+        reuseAudits: r.docs.map((_, j) => j === k ? undefined : (r.audits?.[j] ?? null)) },   // 只重查被修订的那一篇
       log: async text => { setProgress(progressValue, text); await tick(); }, progress: (n, total) => setProgress(60 + 30 * n / total) });
     const conversations = (r.conversations || r.docs.map(() => [])).map(x => [...x]), revisions = [...(r.revisions || r.docs.map(() => 0))];
     conversations[k].push({ request, suggestion: answer.suggestion, model: c.model }); revisions[k]++;
-    computed.suggestions[k] = answer.suggestion;
+    computed.suggestions = computed.suggestions.map((x, j) => j === k ? answer.suggestion : (r.suggestions?.[j] ?? x));
     computed.prompts[k] += "\n\n## 用户本轮补充要求\n" + request;
     last = { ...r, ...computed, conversations, revisions, settings: { ...r.settings, model: c.model, review: false, semantic: false, apply: true }, accountText: r.accountText };
     showResults(last); success = true;
@@ -715,3 +731,51 @@ async function continuePaper(r, k, card) {
     snapshotAccount();
   }
 }
+
+
+/* ---------------- 首屏化验单 ---------------- */
+{
+  const spec = document.querySelector(".specimen");
+  if (spec) {
+    const colors = { "m-dup": "var(--magenta)", "m-def": "#3b7bd6", "m-logic": "#d08a1c" };
+    spec.querySelector(".sheet-notes").innerHTML = [...spec.querySelectorAll(".sheet-text mark")].map(m =>
+      `<div><i style="background:${colors[m.className]}"></i>${esc(m.dataset.note)}</div>`).join("");
+    spec.querySelectorAll(".sheet-notes div").forEach((d, i) => d.style.transitionDelay = (0.4 + i * 0.35) + "s");
+    const still = document.documentElement.dataset.motion === "reduce" || matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const count = () => spec.querySelectorAll(".readings b").forEach(b => {
+      const to = +b.dataset.to, dec = String(b.dataset.to).includes(".") ? 1 : 0;
+      if (still) { b.textContent = to.toFixed(dec); return; }
+      const t0 = performance.now(), dur = 1400;
+      const step = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); b.textContent = (to * e).toFixed(dec); if (k < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+    const start = () => { spec.classList.add("lit"); count(); };
+    if (still) start(); else setTimeout(start, 450);
+  }
+}
+
+/* ---------------- 侧栏步骤、顶栏状态、操作条说明 ---------------- */
+function updateChrome() {
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  const step = (name, done) => document.querySelector(`.steps a[data-step="${name}"]`)?.classList.toggle("done", !!done);
+  const np = files.papers.length, nc = files.corpus.length, ne = files.exclude.length;
+  set("navUpload", np ? `${np} 篇论文${nc ? ` · 比对库 ${nc}` : ""}${ne ? " · 含赛题" : ""}` : "还没有论文");
+  step("upload", np > 0);
+  const checks = [...document.querySelectorAll("#mode input:checked")].map(x => ({ dup: "重复率", def: "防御性语言", logic: "逻辑", hallucination: "幻觉风险" })[x.dataset.check]);
+  set("navSettings", `第 ${level} 挡 · ${checks.length ? checks.length + " 项检查" : "未选检查项"}`);
+  step("settings", checks.length > 0);
+  const connected = $("#st")?.classList.contains("ok") && chat.value;
+  const pName = provider && E.PROVIDERS[provider] ? E.PROVIDERS[provider].name : provider === "custom" ? "自定义服务" : "";
+  set("navModel", connected ? `${pName} · ${chat.value}` : $("#key").value.trim() ? "未连接成功" : "未连接，可跳过");
+  step("model", connected);
+  set("navResults", detecting ? "检测中…" : last ? `已完成 · ${last.docs.length} 篇` : "等待检测");
+  step("results", !!last && !detecting);
+  const pm = $("#pillModel");
+  if (pm) { pm.className = "pill" + (connected ? " on" : $("#st")?.classList.contains("err") ? " warn" : ""); pm.innerHTML = `<i></i>${connected ? esc(pName + " · " + chat.value) : $("#st")?.classList.contains("err") ? "大模型连接失败" : "未连接大模型"}`; }
+  const pb = $("#pillBalance"), bv = $("#balV")?.textContent;
+  if (pb) { const show = connected && bv && bv !== "—"; pb.hidden = !show; if (show) pb.innerHTML = `余额 <b>${esc(bv)}</b>`; }
+  const plan = $("#runPlan");
+  if (plan) plan.textContent = np ? `${checks.join("、") || "未选检查项"} · 第 ${level} 挡${connected ? " · " + chat.value : ""}` : "支持 PDF、DOCX、TXT、MD、TEX，可直接拖进页面";
+}
+setInterval(() => { if (!document.hidden) updateChrome(); }, 1500);
+updateChrome();
