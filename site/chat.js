@@ -188,6 +188,17 @@ window.addEventListener('papersim:results', e => {
   openChatForRun(e.detail?.runId);
 });
 
+window.addEventListener('papersim:run-start', () => {
+  saveChat();
+  currentRunId = null;
+  chatHistory = [];
+  const section = $('#chatSection');
+  if (section) section.style.display = 'none';
+  if ($('#chatMessages')) $('#chatMessages').innerHTML = '';
+  if ($('#chatInput')) $('#chatInput').value = '';
+  if ($('#chatStatus')) $('#chatStatus').textContent = '';
+});
+
 const initChat = () => {
   document.getElementById('chatSend')?.addEventListener('click', send);
   document.getElementById('chatInput')?.addEventListener('keydown', e => {
