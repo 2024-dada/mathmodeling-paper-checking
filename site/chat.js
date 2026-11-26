@@ -1,9 +1,30 @@
-// chat.js — AI 对话与提示词进一步优化
+// chat.js — AI 对话与提示词进一步优化（支持按检测记录持久化）
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+let currentRunId = null;
 let chatHistory = [];
 let isSending = false;
+
+const CHAT_KEY = id => `ps_chat_${id}`;
+
+function saveChat() {
+  if (!currentRunId) return;
+  try {
+    localStorage.setItem(CHAT_KEY(currentRunId), JSON.stringify(chatHistory));
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('ps_chat_')).sort();
+    while (keys.length > 15) localStorage.removeItem(keys.shift());
+  } catch (e) {}
+}
+
+function loadChat(runId) {
+  if (!runId) return [];
+  try {
+    const raw = localStorage.getItem(CHAT_KEY(runId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) { return []; }
+}
 
 function getConfig() {
   const key = ($('#key') || {}).value?.trim() || '';
@@ -51,6 +72,9 @@ function applyPrompt(name, content) {
       textarea.style.transition = 'border-color .4s';
       textarea.style.borderColor = 'var(--mint)';
       setTimeout(() => { textarea.style.borderColor = ''; }, 2500);
+      window.dispatchEvent(new CustomEvent('papersim:prompt-updated', {
+        detail: { index: +card.dataset.k, content, runId: currentRunId }
+      }));
       return true;
     }
   }
@@ -110,6 +134,7 @@ async function send() {
   }
   chatHistory.push({ role: 'user', content: userText });
   appendMessage('user', userText);
+  saveChat();
   if (input) input.value = '';
   isSending = true;
   const sendBtn = $('#chatSend');
@@ -127,9 +152,11 @@ async function send() {
     const reply = data.choices?.[0]?.message?.content || '（无回复）';
     chatHistory.push({ role: 'assistant', content: reply });
     appendMessage('assistant', reply);
+    saveChat();
     if (status) status.textContent = '';
   } catch (e) {
     chatHistory.pop();
+    saveChat();
     appendMessage('error', '发送失败：' + e.message);
     if (status) status.textContent = '';
   } finally {
@@ -138,25 +165,28 @@ async function send() {
   }
 }
 
-function showChat() {
+function openChatForRun(runId) {
   const section = $('#chatSection');
-  if (!section || section.style.display !== 'none') return;
+  if (!section) return;
   section.style.display = 'block';
-  chatHistory = [];
+  currentRunId = runId || null;
+  chatHistory = loadChat(currentRunId);
   const msgs = $('#chatMessages');
-  if (msgs) msgs.innerHTML = '';
+  if (msgs) {
+    msgs.innerHTML = '';
+    chatHistory.forEach(m => {
+      if (m.role === 'user' || m.role === 'assistant') appendMessage(m.role, m.content);
+    });
+  }
   const st = $('#chatStatus');
   if (st) st.textContent = '';
   const info = $('#chatModelInfo');
   if (info) { const { model } = getConfig(); info.textContent = model ? `模型：${model}` : '未选择模型'; }
 }
 
-const resultsEl = document.getElementById('results');
-if (resultsEl) {
-  new MutationObserver(() => {
-    if (resultsEl.style.display && resultsEl.style.display !== 'none') showChat();
-  }).observe(resultsEl, { attributes: true, attributeFilter: ['style'] });
-}
+window.addEventListener('papersim:results', e => {
+  openChatForRun(e.detail?.runId);
+});
 
 const initChat = () => {
   document.getElementById('chatSend')?.addEventListener('click', send);
