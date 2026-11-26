@@ -467,7 +467,7 @@ $("#run").onclick = async () => {
       }
     });
     setProgress(92, "正在整理检测结果…");
-    last = { ...res, corpusDocs: got.corpus, excludeDocs: got.exclude, settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
+    last = { ...res, runTime: Date.now(), corpusDocs: got.corpus, excludeDocs: got.exclude, settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
     if (useLLM) { await say("自动更新余额与消耗…"); await settleBilling(before, null, billingGeneration); }
     snapshotAccount();
     showResults(last);
@@ -569,7 +569,9 @@ function showResults(r) {
     card.querySelector(".cp").onclick = () => copy(r.prompts[k]);
     card.querySelector(".dl").onclick = () => download(`${r.docs[k].name}_优化提示词.md`, r.prompts[k], "text/markdown");
   });
-  $("#results").scrollIntoView({ behavior: scrollMode() });
+window.dispatchEvent(new CustomEvent("papersim:results", { detail: { runId: r.fromHistory || r.runTime, fromHistory: !!r.fromHistory } }));
+  
+$("#results").scrollIntoView({ behavior: scrollMode() });
 }
 async function copy(t) {
   try { await navigator.clipboard.writeText(t); }
@@ -678,7 +680,7 @@ async function histAll() { return (await idbReq((await histStore("readonly")).ge
 
 function toRecord(r) {
   return {
-    time: Date.now(), settings: r.settings, targets: r.targets, accountText: r.accountText || "",
+    time: r.runTime || Date.now(), settings: r.settings, targets: r.targets, accountText: r.accountText || "",
     docs: r.docs.map(d => ({ name: d.name, text: d.text, sentences: d.sentences, summaryCutoff: d.summaryCutoff, nWords: d.nWords })),
     dup: r.dup, dfn: r.dfn, audits: r.audits || null, prompts: r.prompts,
   };
@@ -729,4 +731,19 @@ $("#histClear").onclick = async e => {
   await idbReq((await histStore("readwrite")).clear());
   renderHistory(); toast("历史记录已清空");
 };
+window.addEventListener("papersim:prompt-updated", async e => {
+  const { index, content: newPrompt, runId } = e.detail || {};
+  if (last && typeof index === "number" && last.prompts && index < last.prompts.length) {
+    last.prompts[index] = newPrompt;
+  }
+  if (!runId) return;
+  try {
+    const all = await histAll();
+    const rec = all.find(x => x.time === runId);
+    if (rec && rec.prompts && index < rec.prompts.length) {
+      rec.prompts[index] = newPrompt;
+      await idbReq((await histStore("readwrite")).put(rec));
+    }
+  } catch (err) { console.error("同步更新历史提示词失败", err); }
+});
 renderHistory();
