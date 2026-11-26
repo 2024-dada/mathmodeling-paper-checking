@@ -228,7 +228,7 @@ const chat = Combo($("#cmChat"), { placeholder: "填好 key 后自动列出", on
 const embed = Combo($("#cmEmbed"), { placeholder: "不使用", onChange: v => { if (v) store.set("ps_embed", v); syncOpts(); } });
 function syncOpts() {
   const hasChat = !!chat.value, hasEmbed = !!embed.value;
-  for (const [l, i, ok] of [["#lReview", "#oReview", hasChat], ["#lApply", "#oApply", hasChat], ["#lEmbed", "#oEmbed", hasEmbed]]) {
+  for (const [l, i, ok] of [["#lReview", "#oReview", hasChat], ["#lEmbed", "#oEmbed", hasEmbed]]) {
     $(l).classList.toggle("disabled", !ok); $(i).disabled = !ok;
   }
   if (hasEmbed && !$("#oEmbed")._touched) $("#oEmbed").checked = true;
@@ -427,7 +427,7 @@ $("#run").onclick = async () => {
     embedText: $("#embedText").checked, model: chat.value || "未使用",
     review: selected.includes("def") && $("#oReview").checked && !$("#oReview").disabled,
     semantic: selected.includes("dup") && $("#oEmbed").checked && !$("#oEmbed").disabled,
-    apply: $("#oApply").checked && !$("#oApply").disabled,
+    apply: false,
     corpus: files.corpus.length, exclude: files.exclude.length, logic: selected.includes("logic"), hallucination: selected.includes("hallucination") };
   const configuredClient = client();
   costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
@@ -467,7 +467,7 @@ $("#run").onclick = async () => {
       }
     });
     setProgress(92, "正在整理检测结果…");
-    last = { ...res, corpusDocs: got.corpus, excludeDocs: got.exclude, conversations: res.docs.map(() => []), revisions: res.docs.map(() => 0), settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
+    last = { ...res, corpusDocs: got.corpus, excludeDocs: got.exclude, settings, lex, targets: [E.LEVELS[settings.level - 1].summary, E.LEVELS[settings.level - 1].body] };
     if (useLLM) { await say("自动更新余额与消耗…"); await settleBilling(before, null, billingGeneration); }
     snapshotAccount();
     showResults(last);
@@ -515,7 +515,7 @@ function highlightDef(sent, matches) {
 }
 function paperCard(r, k) {
   const { docs, dup, dfn, prompts, suggestions, lex, targets: [tS, tB] } = r;
-  const doc = docs[k], d = dup[k], f = dfn[k], p = prompts[k], sg = suggestions[k], cats = lex.categories;
+  const doc = docs[k], d = dup[k], f = dfn[k], p = prompts[k], cats = lex.categories;
   const dupBox = d ? `<div class="metric dup"><div class="lab">总重复率</div><div class="big">${pct(d.total)}</div>${track(d.total, "var(--magenta)", null, .5)}
     <div class="kv"><span>逐字 <b>${pct(d.exact)}</b></span><span>改写 <b>${pct(d.paraphrase)}</b></span><span>赛题引用 <b>${pct(d.excluded)}</b></span>
     ${Object.keys(d.bySource).length ? `<span>最相似：<b>${esc(Object.keys(d.bySource)[0])}</b> ${pct(Object.values(d.bySource)[0])}</span>` : ""}</div></div>` : "";
@@ -524,38 +524,21 @@ function paperCard(r, k) {
     <div class="kv"><span>摘要 <b class="${cls(f.summary, tS)}">${pct(f.summary, 0)}</b> / 目标 ${pct(tS, 0)}</span><span>正文 <b class="${cls(f.body, tB)}">${pct(f.body, 0)}</b> / 目标 ${pct(tB, 0)}</span>
     <span>强度 <b>${f.intensity.toFixed(1)}</b> 分/千词</span>${f.llmRate != null ? `<span>大模型复核 <b>${pct(f.llmRate)}</b></span>` : ""}</div>
     <div class="cats">${Object.entries(f.byCategory).map(([c, v]) => `<span>${esc(cats[c].label)}</span><div class="bar" style="width:${Math.max(2, v * 200)}%;background:${CAT_COLOR[c]}"></div><span>${pct(v, 0)}</span>`).join("")}</div></div>` : "";
-  const tabs = [["prompt", "优化提示词"], ...(sg ? [["sug", "AI 修改建议"]] : []), ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
+  const tabs = [["prompt", "优化提示词"], ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
   return `<section class="card paper" data-k="${k}">
-    <h3>${esc(doc.name)}</h3><div class="revision">${r.revisions?.[k] ? `已完成 ${r.revisions[k]} 轮继续优化 · 指标已按修订正文重算` : "初次检测结果"}</div><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
+    <h3>${esc(doc.name)}</h3><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
     <div class="metrics">${dupBox}${defBox}</div>${auditPanel(r.audits?.[k])}
-    <div class="recommendations"><h4>修改建议</h4><ul>${advice(r, k).map(s => `<li>${esc(s)}</li>`).join("")}</ul></div>
     <div class="tabs">${tabs.map(([id, t], i) => `<button data-t="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div>
     <div class="pane on" data-p="prompt"><div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
-    ${sg ? `<div class="pane" data-p="sug"><div class="acts"><button class="btn sm cps">复制</button></div><div class="md">${esc(sg)}</div></div>` : ""}
     ${f ? `<div class="pane" data-p="defs">${f.hits.length ? [...f.hits].sort((a, b) => b.score - a.score).map(h => `<div class="sent"><div class="t">${h.index < doc.summaryCutoff ? "摘要" : "正文"} · ${h.categories.map(c => cats[c].label).join("、")} · 得分 ${h.score}</div>${highlightDef(h.text, h.matches)}</div>`).join("") : `<div class="none">没有检出防御性句</div>`}
       ${f.llmHits.length ? `<div class="hint" style="margin-top:12px">大模型额外判定的防御句：</div>` + f.llmHits.map(h => `<div class="sent"><div class="t">${esc(h.category)}</div>${esc(h.text)}</div>`).join("") : ""}</div>` : ""}
     ${d ? `<div class="pane" data-p="pairs">${d.pairs.length ? d.pairs.map(([s, a, src, b]) => `<div class="pair"><span class="s">${pct(s, 0)}</span> · 来源 ${esc(src)}<br>本文：${esc(a)}<br>来源：${esc(b)}</div>`).join("") : `<div class="none">没有相似句</div>`}</div>
       <div class="pane" data-p="full"><div class="legend"><span><i style="background:rgba(255,60,142,.6)"></i>逐字重复</span><span><i style="background:rgba(255,176,0,.55)"></i>改写相似</span><span><i style="background:rgba(143,92,255,.5)"></i>赛题原文</span></div><div class="fulltext">${highlightDup(doc.text, d.spans)}</div></div>` : ""}
-    ${r.revisions?.[k] ? `<details class="revised"><summary>查看当前修订正文</summary><textarea readonly class="prompt">${esc(doc.text)}</textarea><button class="btn sm revised-download">下载修订正文</button></details>` : ""}
-    <section class="followup"><h4>继续对话优化</h4><p class="hint">输入自定义要求，将发送当前论文、报告和已有对话到你选择的服务商。生成完整修订正文后，自动更新所有论文的比对指标与报告。</p>
-    ${(r.conversations?.[k] || []).length ? `<details><summary>查看 ${r.conversations[k].length} 轮对话记录</summary>${r.conversations[k].map((turn, i) => `<div class="sent"><b>第 ${i + 1} 轮要求</b><p>${esc(turn.request)}</p><b>修改说明</b><div class="md">${esc(turn.suggestion)}</div></div>`).join("")}</details>` : ""}
-    <label>本轮优化要求<textarea class="followup-input" rows="4" placeholder="例如：保留所有数值，把摘要改得更简洁，并说明每处修改理由。"></textarea></label>
-    <button class="btn primary followup-send">继续优化并更新结果</button><p class="followup-status" role="status"></p></section>
   </section>`;
 }
 function auditPanel(audit) {
   if (!audit) return "";
-  return `<section class="paper-audits">${audit.error ? `<p class="audit-error">专项检查没有完成：${esc(audit.error)}。其他检测结果不受影响，可稍后用“继续优化”重试。</p>` : ""}${[["logic", "论文逻辑检查"], ["hallucination", "幻觉风险 · 待核实"]].filter(([key]) => audit[key] !== null).map(([key, label]) => `<h4>${label}</h4><p class="hint">${key === "hallucination" ? "依据论文内容提出核查线索，未联网核实；不能据此断定事实或文献虚假。" : "模型提出的逻辑疑点，需要作者结合公式、数据与上下文复核。"}</p>${audit[key].length ? audit[key].map(item => `<article class="sent"><div class="t">${({high:"优先核查",medium:"建议核查",low:"补充说明"})[item.severity]} · ${esc(item.status)}</div><blockquote>${esc(item.quote)}</blockquote><p>${esc(item.issue)}</p><p><b>建议：</b>${esc(item.suggestion)}</p></article>`).join("") : '<p class="none">未发现能定位到原文的风险项；不代表已完成正确性验证。</p>'}`).join("")}${audit.rejected ? `<p class="hint">模型另有 ${audit.rejected} 条输出无法定位原文或缺少必要信息，未作为检查结论。</p>` : ""}</section>`;
-}
-function advice(r, k) {
-  const a = [], d = r.dup[k], f = r.dfn[k];
-  if (d?.total > 0) a.push("优先核对下方重复高亮与来源，为引用补充标注，并用自己的论证说明模型选择。");
-  if (f?.summary > r.targets[0]) a.push("摘要防御率超过本次目标：逐句检查免责和限定表达，用可验证的结果支撑结论。");
-  if (f?.body > r.targets[1]) a.push("正文防御率超过本次目标：保留必要假设，将重复的局限说明集中整理。");
-
-  if (!a.length) a.push("当前规则未提示优先修改项，请继续人工核对数据、引用、模型假设和结论。");
-
-  return a;
+  return `<section class="paper-audits">${audit.error ? `<p class="audit-error">专项检查没有完成：${esc(audit.error)}。其他检测结果不受影响，可以重新检测再试。</p>` : ""}${[["logic", "论文逻辑检查"], ["hallucination", "幻觉风险 · 待核实"]].filter(([key]) => audit[key] !== null).map(([key, label]) => `<h4>${label}</h4><p class="hint">${key === "hallucination" ? "依据论文内容提出的核查线索，未联网核实，不能据此断定事实或文献虚假。处理要求已写入优化提示词。" : "模型提出的逻辑疑点，需要结合公式、数据与上下文复核。处理要求已写入优化提示词。"}</p>${audit[key].length ? audit[key].map(item => `<article class="sent"><div class="t">${({high:"优先核查",medium:"建议核查",low:"补充说明"})[item.severity]} · ${esc(item.status)}</div><blockquote>${esc(item.quote)}</blockquote><p>${esc(item.issue)}</p></article>`).join("") : '<p class="none">未发现能定位到原文的风险项；不代表已完成正确性验证。</p>'}`).join("")}${audit.rejected ? `<p class="hint">模型另有 ${audit.rejected} 条输出无法定位原文或缺少必要信息，未作为检查结论。</p>` : ""}</section>`;
 }
 function summaryPanel(r) {
   const s = r.settings;
@@ -565,7 +548,7 @@ function summaryPanel(r) {
     "摘要 / 正文目标": r.targets.map(x => pct(x,0)).join(" / "), "改写相似阈值": s.threshold,
     "提示词附全文": s.embedText ? "是" : "否", "对话模型": s.model,
     "防御句复核": s.review ? "开启" : "关闭", "语义检测": s.semantic ? "开启" : "关闭",
-    "模型修改建议": s.apply ? "开启" : "关闭", "论文逻辑检查": s.logic ? "勾选" : "未勾选", "幻觉风险检查": s.hallucination ? "勾选" : "未勾选", "累计继续优化": (r.revisions || []).reduce((a,b) => a+b,0) + " 轮"
+    "论文逻辑检查": s.logic ? "勾选" : "未勾选", "幻觉风险检查": s.hallucination ? "勾选" : "未勾选"
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
 }
 function showResults(r) {
@@ -580,9 +563,6 @@ function showResults(r) {
       card.querySelector(`[data-p="${b.dataset.t}"]`)?.scrollIntoView({ behavior: scrollMode(), block: "start" });
     });
     card.querySelector(".cp").onclick = () => copy(r.prompts[k]);
-    card.querySelector(".cps")?.addEventListener("click", () => copy(r.suggestions[k]));
-    card.querySelector(".followup-send").onclick = () => continuePaper(r, k, card);
-    card.querySelector(".revised-download")?.addEventListener("click", () => download(`${r.docs[k].name}_修订正文.txt`, r.docs[k].text, "text/plain"));
     card.querySelector(".dl").onclick = () => download(`${r.docs[k].name}_优化提示词.md`, r.prompts[k], "text/markdown");
   });
   $("#results").scrollIntoView({ behavior: scrollMode() });
@@ -602,17 +582,17 @@ $("#dlPrompts").onclick = () => last && download(`papersim_提示词_${stamp()}.
 $("#dlCsv").onclick = () => {
   if (!last) return;
   const f4 = x => x == null ? "" : x.toFixed(4);
-  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "继续优化轮数", "逻辑风险数", "待核实事实风险数"]];
+  const rows = [["论文", "词数", "句数", "总重复率", "文字复制比", "改写相似比", "赛题引用比", "最相似来源", "最相似来源重复率", "防御性语言率", "摘要防御率", "正文防御率", "防御强度", "大模型防御率", "逻辑风险数", "待核实事实风险数"]];
   last.docs.forEach((d, i) => {
     const u = last.dup[i], f = last.dfn[i], top = u ? Object.entries(u.bySource)[0] || ["", 0] : ["", null];
     rows.push([d.name, d.nWords, d.sentences.length, f4(u?.total), f4(u?.exact), f4(u?.paraphrase), f4(u?.excluded), top[0], f4(top[1]),
-      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), last.revisions?.[i] || 0, last.audits?.[i]?.logic?.length ?? "", last.audits?.[i]?.hallucination?.length ?? ""]);
+      f4(f?.rate), f4(f?.summary), f4(f?.body), f ? f.intensity.toFixed(2) : "", f4(f?.llmRate), last.audits?.[i]?.logic?.length ?? "", last.audits?.[i]?.hallucination?.length ?? ""]);
   });
   download(`papersim_${stamp()}.csv`, "﻿" + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 };
 $("#dlJson").onclick = () => {
   if (!last) return;
-  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], audits: last.audits?.[i], settings: last.settings, advice: advice(last, i), prompt: last.prompts[i], suggestion: last.suggestions[i], conversation: last.conversations?.[i] || [], revision: last.revisions?.[i] || 0, usage: last.usage, account: last.accountText }));
+  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], audits: last.audits?.[i], settings: last.settings, prompt: last.prompts[i], usage: last.usage, account: last.accountText }));
   download(`papersim_${stamp()}.json`, JSON.stringify(out, null, 1), "application/json");
 };
 $("#dlReport").onclick = () => {
@@ -645,10 +625,8 @@ function pdfBlocks(r) {
     }
     for (const [kind, label] of [["logic", "论文逻辑检查"], ["hallucination", "幻觉风险检查 · 未联网核实"]]) {
       const items = r.audits?.[i]?.[kind];
-      if (items) { blocks.push({ heading: true, text: label }); if (!items.length) blocks.push({ text: "未发现可定位风险，不代表已验证正确性。" }); items.forEach(item => blocks.push({ text: `原文：${item.quote}\n疑点：${item.issue}\n建议：${item.suggestion}（${item.status}）` })); }
+      if (items) { blocks.push({ heading: true, text: label }); if (!items.length) blocks.push({ text: "未发现可定位风险，不代表已验证正确性。" }); items.forEach(item => blocks.push({ text: `原文：${item.quote}\n疑点：${item.issue}（${item.status}）` })); }
     }
-    blocks.push({ heading: true, text: "修改建议" });
-    advice(r, i).forEach(text => blocks.push({ text }));
     if (f?.hits.length) blocks.push({ heading: true, text: "防御性语言与依据" });
     f?.hits.forEach(h => blocks.push({ text: `第 ${h.index + 1} 句 / 得分 ${h.score} / ${h.categories.map(c => r.lex.categories[c].label).join("、")}
 ${h.text}` }));
@@ -658,12 +636,7 @@ ${h.text}` }));
     d?.pairs.forEach(([rate, text, source, original]) => blocks.push({ text: `相似度 ${pct(rate)} / 来源 ${source}
 本文：${text}
 来源原文：${original}` }));
-    if (r.revisions?.[i]) {
-      blocks.push({ heading: true, text: "当前修订正文" }, { text: doc.text });
-      (r.conversations[i] || []).forEach((turn, n) => blocks.push({ heading: true, text: `继续优化第 ${n + 1} 轮` }, { text: `要求：${turn.request}\n修改说明：${turn.suggestion}` }));
-    }
     blocks.push({ heading: true, text: "专项优化提示词" }, { text: r.prompts[i] });
-    blocks.push({ heading: true, text: "AI 修改建议" }, { text: r.suggestions[i] || "本次未生成模型修改建议。上方修改建议由检测规则给出。" });
   });
   return blocks;
 }
@@ -680,52 +653,4 @@ $("#dlPdf").onclick = async () => {
   } catch (e) { toast("PDF 导出失败：" + e.message); console.error(e); }
   finally { btn.textContent = "一键下载 PDF 报告 ↓"; btn.disabled = !last; }
 };
-
-async function continuePaper(r, k, card) {
-  if (blocked() || r !== last) return;
-  const request = card.querySelector(".followup-input").value.trim(), notice = card.querySelector(".followup-status");
-  if (!request) { notice.textContent = "请先填写本轮优化要求"; return; }
-  await restoreBilling(billingIdentity());
-  if (blocked() || r !== last) return;
-  const c = client();
-  if (!c || !$("#key").value.trim()) { notice.textContent = "请先在上方填写 API Key 并选择对话模型"; return; }
-  if (billingOwner !== billingIdentity()) { billingOwner = billingIdentity(); costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 }); }
-  const oldUsage = { ...usage }, previousCost = costByBalance;
-  c.usage = { ...usage }; stopBillingPolls();
-  const generation = billingGeneration;
-  let before = null, success = false, error = null;
-  lockDetection(true); $("#progressState").textContent = "继续优化中，请等待";
-  $("#run").textContent = "继续优化中…"; setProgress(5, "准备本轮对话与论文内容…");
-  try {
-    before = await refreshBalance(true);
-    beginBilling(before);
-    const turns = r.conversations?.[k] || [];
-    const messages = [{ role: "system", content: '你是论文写作编辑。保留原文数字、公式、引用、事实和结论方向，不编造数据或文献；保留必要假设与学术诚信披露。遵循用户的本轮修改要求。只返回 JSON 对象，必须包含 revisedText（完整修订论文纯文本，不是摘要或局部片段）与 suggestion（修改说明与尚待作者核实的项目）。不可自行宣称检测分数，指标由本地引擎重算。' },
-      ...turns.flatMap(t => [{ role: "user", content: t.request }, { role: "assistant", content: t.suggestion }]),
-      { role: "user", content: `当前论文：\n${r.docs[k].text}\n\n当前专项提示词：\n${r.prompts[k]}\n\n上一轮建议：\n${r.suggestions[k] || "无"}\n\n本轮自定义要求：\n${request}` }];
-    setProgress(20, "正在等待模型生成修订正文，请勿重复提交…"); await tick();
-    const answer = await c.chatMessagesJSON(messages);
-    if (typeof answer.revisedText !== "string" || !answer.revisedText.trim() || typeof answer.suggestion !== "string" || !answer.suggestion.trim()) throw new Error("模型未返回完整修订正文与修改说明，当前结果已保留，请重试或调整要求");
-    setProgress(60, "修订正文已生成，正在重算全部论文指标…");
-    const docs = [...r.docs]; docs[k] = E.makeDocument(answer.revisedText, r.docs[k].name, false, true);
-    const computed = await E.run({ docs, corpus: r.corpusDocs, exclude: r.excludeDocs, lex: r.lex, client: c,
-      opt: { only: r.settings.mode === "全部" ? null : r.settings.mode, paraThreshold: r.settings.threshold, level: r.settings.level, embedText: r.settings.embedText, logic: r.settings.logic, hallucination: r.settings.hallucination,
-        reuseAudits: r.docs.map((_, j) => j === k ? undefined : (r.audits?.[j] ?? null)) },   // 只重查被修订的那一篇
-      log: async text => { setProgress(progressValue, text); await tick(); }, progress: (n, total) => setProgress(60 + 30 * n / total) });
-    const conversations = (r.conversations || r.docs.map(() => [])).map(x => [...x]), revisions = [...(r.revisions || r.docs.map(() => 0))];
-    conversations[k].push({ request, suggestion: answer.suggestion, model: c.model }); revisions[k]++;
-    computed.suggestions = computed.suggestions.map((x, j) => j === k ? answer.suggestion : (r.suggestions?.[j] ?? x));
-    computed.prompts[k] += "\n\n## 用户本轮补充要求\n" + request;
-    last = { ...r, ...computed, conversations, revisions, settings: { ...r.settings, model: c.model, review: false, semantic: false, apply: true }, accountText: r.accountText };
-    showResults(last); success = true;
-  } catch (e) { last = r; error = e.message; console.error(e); }
-  finally {
-    setProgress(progressValue, "自动更新余额与本轮消耗…");
-    await settleBilling(before, previousCost, generation).catch(e => { $("#balS").textContent = "余额更新失败：" + e.message; snapshotAccount(); });
-    lockDetection(false); render();
-    if (success) { setProgress(100, `本轮优化完成，新增输入 ${usage.input - oldUsage.input}、输出 ${usage.output - oldUsage.output} tokens；全部指标和导出报告已更新`); $("#progressState").textContent = "继续优化完成"; $("#log").textContent = "继续优化完成"; }
-    else { $("#progressState").textContent = "继续优化未完成，原结果已保留"; $("#runProgress").classList.add("failed"); setProgress(progressValue, error || "优化失败，请重试"); notice.textContent = error || "优化失败，请重试"; }
-    snapshotAccount();
-  }
-}
 

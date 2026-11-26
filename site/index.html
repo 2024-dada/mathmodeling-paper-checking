@@ -244,7 +244,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
     <a href="#upload" aria-current="location"><span>01</span>放入论文</a>
     <a href="#detectionSettings"><span>02</span>检测设置</a>
     <a href="#modelSettings"><span>03</span>模型与服务商</a>
-    <a href="#results"><span>04</span>结果与继续优化</a>
+    <a href="#results"><span>04</span>指标与提示词</a>
   </nav></div>
   <div class="nav-bottom"><button class="btn appearance-trigger" data-open-appearance aria-haspopup="dialog">◐ 界面设置</button><p>论文在浏览器本地解析。<br>按需接入模型，逐轮查看修改依据。</p></div>
 </aside>
@@ -355,7 +355,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
           <label class="check" id="lReview"><input type="checkbox" id="oReview" checked><span>大模型复核防御句<small>补抓词典漏掉的隐晦免责句</small></span></label>
           <label class="check" id="lEmbed"><input type="checkbox" id="oEmbed"><span>语义改写检测<small>需要向量模型，能抓到换了说法的段落</small></span></label>
-          <label class="check" id="lApply"><input type="checkbox" id="oApply"><span>直接生成修改建议<small>用提示词调用模型，每篇一次，较慢也较贵</small></span></label>
+
         </div>
         <div style="margin-top:14px"><button class="btn sm" id="testBtn">测试连接</button> <span class="log" id="testOut"></span></div>
       </div>
@@ -386,7 +386,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
         <button class="btn sm" id="dlJson">下载 JSON</button>
       </div>
     </div>
-    <p class="desc">本次参数、检测指标、账户统计与修改建议集中在这里。</p>
+    <p class="desc">本次参数、检测指标和每篇论文的优化提示词集中在这里。</p>
     <div class="card" id="runSummary"><h3>等待检测</h3><p class="desc">选择论文并开始检测后，将显示本次参数与汇总结果。</p></div>
     <div class="card"><h3>账户与本次消耗</h3>        <div class="meter" id="meter">
           <div><div class="k">账户余额<button class="rf" id="balRf" title="刷新余额">刷新</button></div><div class="v money" id="balV">—</div><div class="s" id="balS">填好 key 后自动查询</div></div>
@@ -394,7 +394,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
           <div class="full"><div class="k">本次检测与续聊累计用量</div><div class="s" id="useS" style="font-family:var(--mono);color:var(--ink2)">0 次调用 · 输入 0 · 输出 0 tokens</div></div>
         </div></div>
     <div id="papers"></div>
-    <div class="pdf-download"><div><h3>把结果带走</h3><p>本次参数、全部指标、判定依据、修改建议和优化提示词，合并为一份 PDF。浏览器本地生成，直接下载。</p></div><button class="btn primary" id="dlPdf" disabled>一键下载 PDF 报告 ↓</button></div>
+    <div class="pdf-download"><div><h3>把结果带走</h3><p>本次参数、全部指标、判定依据和优化提示词，合并为一份 PDF。浏览器本地生成，直接下载。</p></div><button class="btn primary" id="dlPdf" disabled>一键下载 PDF 报告 ↓</button></div>
   </section>
 
   <footer>
