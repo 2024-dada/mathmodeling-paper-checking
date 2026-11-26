@@ -471,6 +471,7 @@ $("#run").onclick = async () => {
     if (useLLM) { await say("自动更新余额与消耗…"); await settleBilling(before, null, billingGeneration); }
     snapshotAccount();
     showResults(last);
+    saveHistory(last);
     setProgress(100, "全部检测与报告整理已完成"); completed = true;
   } catch (e) {
     failure = e.message; last = null;
@@ -552,6 +553,9 @@ function summaryPanel(r) {
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
 }
 function showResults(r) {
+  const banner = $("#histBanner");
+  if (banner) { banner.hidden = !r.fromHistory; if (r.fromHistory) banner.textContent = `正在查看 ${fmtTime(r.fromHistory)} 的历史结果。账户余额与消耗显示的是当前账户，不是当时的数据。`; }
+  document.querySelectorAll(".hist-item").forEach(el => el.classList.toggle("current", r.fromHistory && +el.dataset.time === r.fromHistory));
   $("#dlPdf").disabled = false;
   $("#results").style.display = "block";
   $("#runSummary").innerHTML = summaryPanel(r);
@@ -654,3 +658,75 @@ $("#dlPdf").onclick = async () => {
   finally { btn.textContent = "一键下载 PDF 报告 ↓"; btn.disabled = !last; }
 };
 
+
+/* ---------------- 最近查询（只保存在本机浏览器的 IndexedDB） ---------------- */
+const HIST_MAX = 10;
+const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const idbReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+let histDbPromise = null;
+function histDb() {
+  if (!histDbPromise) histDbPromise = new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error("当前浏览器不支持本地保存"));
+    const r = indexedDB.open("papersim-history", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("runs", { keyPath: "id", autoIncrement: true });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  return histDbPromise;
+}
+async function histStore(mode) { return (await histDb()).transaction("runs", mode).objectStore("runs"); }
+async function histAll() { return (await idbReq((await histStore("readonly")).getAll())).sort((a, b) => b.time - a.time); }
+
+function toRecord(r) {
+  return {
+    time: Date.now(), settings: r.settings, targets: r.targets, accountText: r.accountText || "",
+    docs: r.docs.map(d => ({ name: d.name, text: d.text, sentences: d.sentences, summaryCutoff: d.summaryCutoff, nWords: d.nWords })),
+    dup: r.dup, dfn: r.dfn, audits: r.audits || null, prompts: r.prompts,
+  };
+}
+async function saveHistory(r) {
+  try {
+    const rec = JSON.parse(JSON.stringify(toRecord(r)));
+    await idbReq((await histStore("readwrite")).add(rec));
+    const all = await histAll();
+    for (const old of all.slice(HIST_MAX)) await idbReq((await histStore("readwrite")).delete(old.id));
+  } catch (e) { console.error("保存历史记录失败", e); }
+  renderHistory();
+}
+async function renderHistory() {
+  const box = $("#histList"); if (!box) return;
+  let all;
+  try { all = await histAll(); }
+  catch (e) { box.innerHTML = `<p class="none">${esc(e.message)}，无法保存历史记录。</p>`; return; }
+  $("#histClear").hidden = !all.length;
+  if (!all.length) { box.innerHTML = '<p class="none">还没有查询记录。完成一次检测后会自动保存在这里。</p>'; return; }
+  box.innerHTML = all.map(rec => {
+    const rows = rec.docs.slice(0, 4).map((d, i) => {
+      const u = rec.dup?.[i], f = rec.dfn?.[i], a = rec.audits?.[i];
+      const bits = [u ? `重复率 <b>${pct(u.total)}</b>` : "", f ? `防御率 <b>${pct(f.rate)}</b>` : "",
+        a?.logic ? `逻辑 <b>${a.logic.length}</b> 处` : "", a?.hallucination ? `待核实 <b>${a.hallucination.length}</b> 处` : ""].filter(Boolean).join("　");
+      return `<li><span class="hist-name">${esc(d.name)}</span><span class="hist-m">${bits || "—"}</span></li>`;
+    }).join("") + (rec.docs.length > 4 ? `<li class="hist-more">另有 ${rec.docs.length - 4} 篇</li>` : "");
+    return `<article class="hist-item${last?.fromHistory === rec.time ? " current" : ""}" data-time="${rec.time}">
+      <div class="hist-top"><b>${fmtTime(rec.time)}</b><span>${rec.docs.length} 篇 · 第 ${rec.settings?.level ?? "—"} 挡</span>
+        <span class="hist-acts"><button class="btn sm" data-view="${rec.id}">查看</button><button class="btn sm ghost" data-del="${rec.id}">删除</button></span></div>
+      <ul>${rows}</ul></article>`;
+  }).join("");
+  box.querySelectorAll("[data-view]").forEach(b => b.onclick = () => viewHistory(+b.dataset.view));
+  box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await idbReq((await histStore("readwrite")).delete(+b.dataset.del)); renderHistory(); });
+}
+async function viewHistory(id) {
+  if (detecting) { toast("检测进行中，完成后再查看历史"); return; }
+  const rec = await idbReq((await histStore("readonly")).get(id));
+  if (!rec) { renderHistory(); return; }
+  await lexReady;
+  last = { ...rec, suggestions: rec.docs.map(() => null), corpusDocs: [], excludeDocs: [], lex: E.compileLexicon(LEX), fromHistory: rec.time };
+  showResults(last);
+}
+$("#histClear").onclick = async e => {
+  const b = e.currentTarget;
+  if (!b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "再点一次确认清空"; setTimeout(() => { delete b.dataset.armed; b.textContent = "清空历史"; }, 3000); return; }
+  delete b.dataset.armed; b.textContent = "清空历史";
+  await idbReq((await histStore("readwrite")).clear());
+  renderHistory(); toast("历史记录已清空");
+};
+renderHistory();
