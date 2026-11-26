@@ -424,7 +424,7 @@ $("#run").onclick = async () => {
   $("#runSummary").innerHTML = '<h3>检测进行中</h3><p>本次完成后更新参数与结果。</p>';
   $("#papers").innerHTML = "";
   const settings = { mode: mode || "全部", level, threshold: +$("#para").value,
-    embedText: $("#embedText").checked, model: chat.value || "未使用",
+    embedText: false, model: chat.value || "未使用",
     review: selected.includes("def") && $("#oReview").checked && !$("#oReview").disabled,
     semantic: selected.includes("dup") && $("#oEmbed").checked && !$("#oEmbed").disabled,
     apply: false,
@@ -546,7 +546,7 @@ function summaryPanel(r) {
     "被测论文": r.docs.length + " 篇", "比对库": s.corpus + " 篇", "赛题原文": s.exclude + " 篇",
     "检测内容": ({dup:"重复率",def:"防御性语言",none:"仅模型专项检查"})[s.mode] || "全部", "防御率挡位": s.level,
     "摘要 / 正文目标": r.targets.map(x => pct(x,0)).join(" / "), "改写相似阈值": s.threshold,
-    "提示词附全文": s.embedText ? "是" : "否", "对话模型": s.model,
+    "对话模型": s.model,
     "防御句复核": s.review ? "开启" : "关闭", "语义检测": s.semantic ? "开启" : "关闭",
     "论文逻辑检查": s.logic ? "勾选" : "未勾选", "幻觉风险检查": s.hallucination ? "勾选" : "未勾选"
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
