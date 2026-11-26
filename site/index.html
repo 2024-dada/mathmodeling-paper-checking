@@ -226,6 +226,26 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--cyan);color:var(--night);font-weight:700;padding:9px 18px;font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:60}
 .toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- AI 对话 ---------- */
+.chat-hd{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.chat-hd h2{margin:0}
+.chat-model-badge{font:12px var(--mono);color:var(--ink3);border:1px solid var(--line);padding:2px 8px}
+.chat-messages{display:flex;flex-direction:column;gap:10px;margin:12px 0 16px;max-height:480px;overflow-y:auto;padding-right:4px}
+.chat-bubble{padding:10px 14px;font-size:13.5px;line-height:1.65;border:1px solid var(--line)}
+.chat-user{background:rgba(45,226,230,.07);border-color:rgba(45,226,230,.35);align-self:flex-end;max-width:85%}
+.chat-user::before{content:"你";display:block;font:700 11px var(--mono);color:var(--cyan);margin-bottom:5px}
+.chat-assistant{background:rgba(13,11,30,.7);align-self:flex-start;max-width:92%}
+.chat-assistant::before{content:"AI";display:block;font:700 11px var(--mono);color:var(--violet);margin-bottom:5px}
+.chat-error{border-color:var(--magenta);background:rgba(255,60,142,.06);color:var(--magenta);padding:8px 12px;font-size:13px}
+.chat-bubble pre{background:rgba(0,0,0,.4);padding:10px 12px;overflow-x:auto;font:12px/1.5 var(--mono);margin:8px 0 4px;border:1px solid var(--line);white-space:pre-wrap;word-break:break-word}
+.chat-code{font-family:var(--mono);font-size:12.5px;background:rgba(0,0,0,.3);padding:1px 5px}
+.chat-updated-block{margin-top:8px;border:1px solid rgba(92,242,166,.35);background:rgba(92,242,166,.04);padding:10px 12px}
+.chat-updated-title{font:700 12px var(--mono);color:var(--mint);margin-bottom:6px}
+.chat-apply-row{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.chat-input-row{display:flex;gap:10px;align-items:flex-end}
+.chat-textarea{flex:1;font:inherit;border:1px solid var(--line);padding:10px 12px;background:rgba(10,8,26,.85);color:var(--ink);resize:vertical;min-height:72px;border-radius:0;font-size:13.5px}
+.chat-textarea:focus{outline:2px solid var(--cyan);outline-offset:1px}
 </style>
 <link rel="stylesheet" href="studio.css?v=conversation1">
 <link rel="stylesheet" href="appearance.css?v=3">
@@ -414,7 +434,23 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
     <p><b>指标说明。</b>总重复率是与比对库逐字重复（连续 8 个英文词或 13 个汉字）和改写相似（句子相似度不低于阈值）的词数占全文的比例；与赛题原文相同的部分单列，不计入。防御性语言率是防御性句数占总句数的比例：按否定式免责、对照纠偏、局限声明、范围限定、模糊限定 5 类打分，总分不低于 1 的句子算防御性句。</p>
     <p><b>服务商不允许网页直接调用时</b>，页面会提示“浏览器无法访问”。可以换一家服务商、填写支持跨域的中转地址，或者用本地版：<code>pip install -e .</code> 后运行 <code>papersim-web</code>，界面相同，API 请求经本机转发。</p>
     <p>本工具用于自查和改进写作。竞赛要求如实披露 AI 使用，请在论文的 AI 使用报告中说明。</p>
-  </footer>
+  
+  <!-- === 06 AI 对话与提示词优化 === -->
+  <section class="card" id="chatSection" style="display:none;" aria-label="与 AI 进一步完善提示词">
+    <div class="chat-hd">
+      <h2><span class="n">6</span>与 AI 进一步完善</h2>
+      <span id="chatModelInfo" class="chat-model-badge"></span>
+    </div>
+    <p class="desc">检测完成后，在这里和已选的 AI 继续交流，让它根据你的具体要求进一步优化上方生成的优化提示词。对话历史会在新一次检测后自动重置。按 <kbd>Ctrl+Enter</kbd> 发送。</p>
+    <div id="chatMessages" class="chat-messages" aria-live="polite" aria-label="对话记录"></div>
+    <div class="chat-input-row">
+      <textarea id="chatInput" class="chat-textarea" rows="3" placeholder="告诉 AI 你想怎么改进提示词，例如：让语气更正式 / 重点突出公式推导部分 / 增加对图表引用的建议…"></textarea>
+      <button class="btn primary" id="chatSend">发送</button>
+    </div>
+    <div id="chatStatus" class="log" role="status" aria-live="polite"></div>
+  </section>
+
+</footer>
 </div>
 
 
@@ -436,6 +472,9 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 </dialog>
 <script type="module" src="scene.js?v=1"></script>
 <script type="module" src="app.js?v=noir1"></script>
+  
+<script type="module" src="chat.js?v=1"></script>
+
   
 <script>
 function initKaTeX() {
