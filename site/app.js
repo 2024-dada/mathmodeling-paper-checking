@@ -39,6 +39,7 @@ function lockDetection(lock) {
   $("#progressState").textContent = lock ? "检测中，请等待" : "检测完成";
   $("#progressTrack").setAttribute("aria-busy", String(lock));
   if (lock) {
+    window.dispatchEvent(new CustomEvent("papersim:run-start"));
     inputGeneration++; progressValue = 0; $("#runProgress").hidden = false;
     $("#runProgress").classList.remove("failed");
     document.querySelectorAll(".combo .pop").forEach(el => el.classList.remove("open"));
