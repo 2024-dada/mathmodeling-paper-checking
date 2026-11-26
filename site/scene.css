@@ -1,0 +1,29 @@
+/* 统一背景：整页只用一张背景图，首屏不再单独铺图，改为半透明玻璃透出同一张图。 */
+.hero::after{display:none!important}
+.hero{background:linear-gradient(90deg,
+  color-mix(in srgb,var(--panel) 94%,transparent) 0%,
+  color-mix(in srgb,var(--panel) 78%,transparent) 34%,
+  color-mix(in srgb,var(--panel) 22%,transparent) 72%,
+  color-mix(in srgb,var(--panel) 6%,transparent) 100%)!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+@media(max-width:760px){.hero{background:color-mix(in srgb,var(--panel) 82%,transparent)!important}}
+
+/* 动态背景：镜头缓慢推移 + 飘雾；光效由 scene.js 画在同一图层上 */
+.cityscape{inset:-4%!important;overflow:hidden;transform-origin:62% 55%;will-change:transform}
+.cityscape canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cityscape .fog{position:absolute;inset:-10% -35%;pointer-events:none;will-change:transform;
+  background:
+    radial-gradient(38% 12% at 28% 60%,rgba(180,210,235,.20),transparent 70%),
+    radial-gradient(30% 10% at 58% 57%,rgba(180,210,235,.14),transparent 70%),
+    radial-gradient(45% 16% at 12% 66%,rgba(160,195,225,.16),transparent 70%)}
+.cityscape .fog.b{opacity:.75;background:
+    radial-gradient(34% 11% at 46% 63%,rgba(180,210,235,.16),transparent 70%),
+    radial-gradient(28% 9% at 80% 55%,rgba(180,210,235,.10),transparent 70%)}
+@media (prefers-reduced-motion:no-preference){
+  :root:not([data-motion=reduce]) .cityscape{animation:camera 80s ease-in-out infinite alternate}
+  :root:not([data-motion=reduce]) .cityscape .fog{animation:drift 55s ease-in-out infinite alternate}
+  :root:not([data-motion=reduce]) .cityscape .fog.b{animation-duration:75s;animation-direction:alternate-reverse}
+}
+@keyframes camera{0%{transform:scale(1) translate3d(0,0,0)}100%{transform:scale(1.07) translate3d(-1.8%,-1.1%,0)}}
+@keyframes drift{0%{transform:translate3d(-7%,0,0)}100%{transform:translate3d(7%,-1%,0)}}
+.scene-lite .cityscape,.scene-lite .cityscape .fog{animation:none!important}
