@@ -232,6 +232,12 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 <link rel="stylesheet" href="noir.css?v=1">
 <link rel="stylesheet" href="scene.css?v=1">
 <script src="appearance.js?v=4"></script>
+  
+<!-- KaTeX: LaTeX 公式渲染 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="initKaTeX()"></script>
+
 </head>
 <body>
 <div class="cityscape" aria-hidden="true"><div class="fog"></div><div class="fog b"></div></div>
@@ -430,5 +436,34 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
 </dialog>
 <script type="module" src="scene.js?v=1"></script>
 <script type="module" src="app.js?v=noir1"></script>
+  
+<script>
+function initKaTeX() {
+  var opts = {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '$', right: '$', display: false},
+      {left: '\\(', right: '\\)', display: false},
+      {left: '\\[', right: '\\]', display: true}
+    ],
+    throwOnError: false
+  };
+  function renderMath(el) {
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(el, opts);
+    }
+  }
+  renderMath(document.body);
+  var observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType === 1) renderMath(node);
+      });
+    });
+  });
+  observer.observe(document.body, {childList: true, subtree: true});
+}
+</script>
+
 </body>
 </html>
