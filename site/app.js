@@ -1,5 +1,5 @@
-import * as E from "./engine.js?v=quote-recovery1";
-import { pdfToText } from "./pdftext.js";
+import * as E from "./engine.js?v=context-review2";
+import { pdfToText } from "./pdftext.js?v=context-review2";
 import { reportPdf } from "./reportpdf.js";
 import { docxToText } from "./docxtext.js";
 
@@ -75,11 +75,12 @@ async function loadPdfjs() {
   return pdfjs;
 }
 async function readDoc(f, isExclude) {
-  let raw;
-  if (/\.pdf$/i.test(f.name)) raw = await pdfToText(await loadPdfjs(), new Uint8Array(await f.arrayBuffer()));
+  let raw, extraction = null;
+  if (/\.pdf$/i.test(f.name)) raw = await pdfToText(await loadPdfjs(), new Uint8Array(await f.arrayBuffer()), info => { extraction = info; });
   else if (/\.docx$/i.test(f.name)) raw = await docxToText(await f.arrayBuffer());
   else raw = await f.text();
-  return E.makeDocument(raw, f.name.replace(/\.[^.]+$/, ""), false, !isExclude);
+  return { ...E.makeDocument(raw, f.name.replace(/\.[^.]+$/, ""), false, !isExclude),
+    sourceText: raw, sourceFormat: f.name.split(".").at(-1).toLowerCase(), extraction };
 }
 
 /* ---------------- 文件 ---------------- */
@@ -539,8 +540,9 @@ function paperCard(r, k) {
   </section>`;
 }
 function writingPanel(summary) {
-  if (!summary?.rejected) return "";
-  return `<section class="paper-audits" role="status"><h4>润色指导 · 引用校验说明</h4><p>已保留 ${summary.verified} 条可定位的具体指导；另有 ${summary.rejected} 条模型引用未定位，已排除对应问题项，不影响本次检测完成。${summary.verified ? "" : "本次仅提供总体指导和验收清单，不代表论文没有问题。"}</p></section>`;
+  if (!summary) return "";
+  const contextRejected = summary.contextRejected || 0, review = (summary.needsVisualReview || 0) + (summary.needsContentReview || 0);
+  return `<section class="paper-audits" role="status"><h4>润色指导 · 建议校验说明</h4><p>${summary.verified} 条建议可定位，未发现已检查的上下文冲突；这不代表建议全部正确。${summary.rejected ? `另有 ${summary.rejected} 条引用未定位，已排除对应问题。` : ""}${contextRejected ? `已排除 ${contextRejected} 条与已提供章节或文献信息冲突的建议。` : ""}${review ? `${review} 条涉及版式、完整性或术语上下文的疑问仅列为待核对，不作为改稿指令。` : ""}</p></section>`;
 }
 function auditPanel(audit) {
   if (!audit) return "";
@@ -687,7 +689,7 @@ async function histAll() { return (await idbReq((await histStore("readonly")).ge
 function toRecord(r) {
   return {
     time: r.runTime || Date.now(), settings: r.settings, targets: r.targets, accountText: r.accountText || "",
-    docs: r.docs.map(d => ({ name: d.name, text: d.text, sentences: d.sentences, summaryCutoff: d.summaryCutoff, nWords: d.nWords })),
+    docs: r.docs.map(d => ({ name: d.name, text: d.text, sentences: d.sentences, summaryCutoff: d.summaryCutoff, nWords: d.nWords, sourceText: d.sourceText, sourceFormat: d.sourceFormat, extraction: d.extraction })),
     dup: r.dup, dfn: r.dfn, audits: r.audits || null, writing: r.writing || null, prompts: r.prompts,
   };
 }
