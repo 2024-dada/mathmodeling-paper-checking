@@ -1,3 +1,5 @@
+import { loadWritingResources, generateWritingGuidance } from "./writing-guidance.js";
+
 // papersim 浏览器端引擎：与 Python 版 papersim 算法一致（抽取清洗、重复率、防御性语言率、优化提示词）。
 // 浏览器和 Node 都可以 import。
 
@@ -682,10 +684,12 @@ hallucination：无出处数据、引文与正文不符、缺乏证据的事实�
 /* ============================== 总流程 ============================== */
 export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, client = null, log = () => {}, progress = () => {} }) {
   const k = docs.length;
+  if (opt.polish && !client) throw new Error("学术润色指导需要填写 API Key 并选择对话模型");
+  const writingResources = opt.polish ? await loadWritingResources() : null;
   if (!["def", "none"].includes(opt.only) && docs.length + corpus.length < 2) throw new Error("重复率至少需要两篇（被测论文 + 比对库）。只测防御性语言请选“只看防御性语言”");
   if (opt.threshold != null) lex.threshold = opt.threshold;
   let dup = Array(k).fill(null), dfn = Array(k).fill(null), audits = Array(k).fill(null);
-  const total = k * (1 + (!["def", "none"].includes(opt.only) ? 1 : 0) + (!["dup", "none"].includes(opt.only) ? 1 : 0) + (!["dup", "none"].includes(opt.only) && client && opt.llmReview ? 1 : 0) + (client && opt.apply ? 1 : 0) + (opt.logic || opt.hallucination ? 1 : 0));
+  const total = k * (1 + (!["def", "none"].includes(opt.only) ? 1 : 0) + (!["dup", "none"].includes(opt.only) ? 1 : 0) + (!["dup", "none"].includes(opt.only) && client && opt.llmReview ? 1 : 0) + (client && opt.apply && !opt.polish ? 1 : 0) + (opt.logic || opt.hallucination ? 1 : 0) + (opt.polish ? 1 : 0));
   let done = 0;
   const advance = () => progress(++done, total);
   if (!["def", "none"].includes(opt.only)) {
@@ -723,7 +727,15 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
       prompts[i] += notes.join("\n");
     }
     advance();
-    if (client && opt.apply) {
+    if (opt.polish) {
+      await log(`生成学术润色指导提示词 ${i + 1}/${k}：${docs[i].name}（不直接改写正文）`);
+      prompts[i] = await generateWritingGuidance(docs[i], client, writingResources, {
+        locateQuote, diagnostics: { duplication: dup[i] ? { rate: dup[i].total, pairs: dup[i].pairs.slice(0, 15) } : null,
+          defensive: dfn[i] ? { rate: dfn[i].rate, hits: dfn[i].hits.slice(0, 20).map(h => h.text) } : null, audits: audits[i] }
+      });
+      advance();
+    }
+    if (client && opt.apply && !opt.polish) {
       await log(`大模型生成修改建议 ${i + 1}/${k}：${docs[i].name}`);
       suggestions.push(await client.chatText(opt.embedText ? prompts[i] : prompts[i] + "\n\n## 附：论文全文\n\n" + docs[i].text));
       advance();

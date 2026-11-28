@@ -1,0 +1,21 @@
+{
+  "humanizerChecks": 31,
+  "academicWritingTasks": 17,
+  "gptAcademicCoreTasks": 9,
+  "scope": "提示词与原始源码参考；不包含本机应用运行环境或插件执行工具",
+  "files": [
+    {
+      "file": "prompts.json",
+      "sha256": "919c2d5fb82fcc9cc86b85170d0f6a8ded519f6211da7bb23849d04e74bfdf28"
+    },
+    {
+      "file": "adapters.json",
+      "sha256": "730f12295c49edb7120bc155796959456659d0ab900ad8d615fbed091cfddacc"
+    },
+    {
+      "file": "academic-core-source.txt",
+      "sha256": "2c59f3c69519bd1333c7cd01b7ef0c7c87f50703f044c660c1748d454b84c50c"
+    }
+  ],
+  "hashFormat": "SHA-256 of UTF-8 text with LF line endings"
+}

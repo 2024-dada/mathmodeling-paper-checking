@@ -416,7 +416,7 @@ $("#run").onclick = async () => {
   if (blocked() || !files.papers.length) return;
   const selected = [...document.querySelectorAll("#mode input:checked")].map(x => x.dataset.check);
   if (!selected.length) { toast("请至少勾选一个检查方面"); return; }
-  if ((selected.includes("logic") || selected.includes("hallucination")) && (!chat.value || !$("#key").value.trim())) { toast("逻辑与幻觉风险检查需要填写 API Key 并选择对话模型"); return; }
+  if ((selected.includes("logic") || selected.includes("hallucination") || selected.includes("polish")) && (!chat.value || !$("#key").value.trim())) { toast("逻辑、幻觉风险和学术润色指导需要填写 API Key 并选择对话模型"); return; }
   if (selected.includes("dup") && files.papers.length + files.corpus.length < 2) { toast("重复率至少需要两篇：再放一篇被测论文或比对库，或取消勾选“重复率”"); $("#log").textContent = "重复率至少需要两篇论文"; return; }
   const btn = $("#run"), log = $("#log");
   stopBillingPolls(); billingOwner = billingIdentity(); billingBaseline = null; saveBilling();
@@ -429,7 +429,7 @@ $("#run").onclick = async () => {
     review: selected.includes("def") && $("#oReview").checked && !$("#oReview").disabled,
     semantic: selected.includes("dup") && $("#oEmbed").checked && !$("#oEmbed").disabled,
     apply: false,
-    corpus: files.corpus.length, exclude: files.exclude.length, logic: selected.includes("logic"), hallucination: selected.includes("hallucination") };
+    corpus: files.corpus.length, exclude: files.exclude.length, logic: selected.includes("logic"), hallucination: selected.includes("hallucination"), polish: selected.includes("polish") };
   const configuredClient = client();
   costByBalance = null; showUsage({ calls: 0, input: 0, output: 0, cached: 0, embed: 0 });
   $("#costV").textContent = "—"; $("#costS").textContent = "本次尚未产生 API 消耗";
@@ -452,7 +452,7 @@ $("#run").onclick = async () => {
       setProgress(3 + 27 * (i + 1) / all.length, `已读取 ${i + 1}/${all.length} 个文件`);
     }
     for (const d of got.papers) if (d.sentences.length < 3) toast(`${d.name} 几乎没抽出文字，可能是扫描版 PDF`);
-    useLLM = configuredClient && (settings.review || settings.apply || settings.semantic || settings.logic || settings.hallucination);
+    useLLM = configuredClient && (settings.review || settings.apply || settings.semantic || settings.logic || settings.hallucination || settings.polish);
     if (useLLM) {
       costByBalance = null;
       $("#costV").textContent = "…"; $("#costS").textContent = "运行中，实时统计";
@@ -464,7 +464,7 @@ $("#run").onclick = async () => {
       opt: {
         only: settings.mode === "全部" ? null : settings.mode, paraThreshold: settings.threshold, level: settings.level,
         embedText: settings.embedText, llmReview: settings.review,
-        llmEmbed: settings.semantic, apply: settings.apply, logic: settings.logic, hallucination: settings.hallucination,
+        llmEmbed: settings.semantic, apply: settings.apply, logic: settings.logic, hallucination: settings.hallucination, polish: settings.polish,
       }
     });
     setProgress(92, "正在整理检测结果…");
@@ -526,12 +526,12 @@ function paperCard(r, k) {
     <div class="kv"><span>摘要 <b class="${cls(f.summary, tS)}">${pct(f.summary, 0)}</b> / 目标 ${pct(tS, 0)}</span><span>正文 <b class="${cls(f.body, tB)}">${pct(f.body, 0)}</b> / 目标 ${pct(tB, 0)}</span>
     <span>强度 <b>${f.intensity.toFixed(1)}</b> 分/千词</span>${f.llmRate != null ? `<span>大模型复核 <b>${pct(f.llmRate)}</b></span>` : ""}</div>
     <div class="cats">${Object.entries(f.byCategory).map(([c, v]) => `<span>${esc(cats[c].label)}</span><div class="bar" style="width:${Math.max(2, v * 200)}%;background:${CAT_COLOR[c]}"></div><span>${pct(v, 0)}</span>`).join("")}</div></div>` : "";
-  const tabs = [["prompt", "优化提示词"], ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
+  const tabs = [["prompt", r.settings.polish ? "学术润色指导提示词" : "优化提示词"], ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
   return `<section class="card paper" data-k="${k}">
     <h3>${esc(doc.name)}</h3><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
     <div class="metrics">${dupBox}${defBox}</div>${auditPanel(r.audits?.[k])}
     <div class="tabs">${tabs.map(([id, t], i) => `<button data-t="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div>
-    <div class="pane on" data-p="prompt"><div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
+    <div class="pane on" data-p="prompt">${r.settings.polish ? '<p class="hint">已结合三套资料生成论文专属指导。复制本提示词并另附原文交给模型执行；正文未被修改。支持在下方继续对话完善指导，或随报告导出 PDF。</p>' : ""}<div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
     ${f ? `<div class="pane" data-p="defs">${f.hits.length ? [...f.hits].sort((a, b) => b.score - a.score).map(h => `<div class="sent"><div class="t">${h.index < doc.summaryCutoff ? "摘要" : "正文"} · ${h.categories.map(c => cats[c].label).join("、")} · 得分 ${h.score}</div>${highlightDef(h.text, h.matches)}</div>`).join("") : `<div class="none">没有检出防御性句</div>`}
       ${f.llmHits.length ? `<div class="hint" style="margin-top:12px">大模型额外判定的防御句：</div>` + f.llmHits.map(h => `<div class="sent"><div class="t">${esc(h.category)}</div>${esc(h.text)}</div>`).join("") : ""}</div>` : ""}
     ${d ? `<div class="pane" data-p="pairs">${d.pairs.length ? d.pairs.map(([s, a, src, b]) => `<div class="pair"><span class="s">${pct(s, 0)}</span> · 来源 ${esc(src)}<br>本文：${esc(a)}<br>来源：${esc(b)}</div>`).join("") : `<div class="none">没有相似句</div>`}</div>
@@ -550,7 +550,8 @@ function summaryPanel(r) {
     "摘要 / 正文目标": r.targets.map(x => pct(x,0)).join(" / "), "改写相似阈值": s.threshold,
     "对话模型": s.model,
     "防御句复核": s.review ? "开启" : "关闭", "语义检测": s.semantic ? "开启" : "关闭",
-    "论文逻辑检查": s.logic ? "勾选" : "未勾选", "幻觉风险检查": s.hallucination ? "勾选" : "未勾选"
+    "论文逻辑检查": s.logic ? "勾选" : "未勾选", "幻觉风险检查": s.hallucination ? "勾选" : "未勾选",
+    "学术润色指导": s.polish ? "勾选 · 生成指导，不直接改稿" : "未勾选"
   }).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
 }
 function showResults(r) {
@@ -718,7 +719,7 @@ async function renderHistory() {
   box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await idbReq((await histStore("readwrite")).delete(+b.dataset.del)); renderHistory(); });
 }
 async function viewHistory(id) {
-  if (detecting || writingBusy) { toast("检测或润色进行中，完成后再查看历史"); return; }
+  if (detecting) { toast("检测进行中，完成后再查看历史"); return; }
   const rec = await idbReq((await histStore("readonly")).get(id));
   if (!rec) { renderHistory(); return; }
   await lexReady;
@@ -748,38 +749,3 @@ window.addEventListener("papersim:prompt-updated", async e => {
   } catch (err) { console.error("同步更新历史提示词失败", err); }
 });
 renderHistory();
-
-
-// 独立润色页通过同源消息复用当前配置，密钥保留在主页面内存。
-const writingWindows = new Map();
-let writingBusy = false;
-window.addEventListener('message', async e => {
-  if (e.origin !== location.origin || !e.source || !e.data?.session) return;
-  const d = e.data;
-  if (d.type === 'papersim:writing-connect') {
-    // 只接受由本页面打开、同源且具有指定路径的工作台。
-    try { if (e.source.opener !== window || new URL(e.source.location.href).pathname !== new URL('writing.html',location.href).pathname) return; } catch { return; }
-    writingWindows.set(e.source,d.session);
-    e.source.postMessage({type:'papersim:writing-ready',session:d.session,ready:!!client(false)},location.origin);
-    return;
-  }
-  if (d.type !== 'papersim:writing-run' || writingWindows.get(e.source) !== d.session) return;
-  const reply = x => e.source.postMessage({session:d.session,id:d.id,...x},location.origin);
-  if (writingBusy || detecting) { reply({type:'papersim:writing-error',error:'已有任务正在处理，请稍后重试'}); return; }
-  const c = client(false);
-  const owner = billingIdentity();
-  if (!c || !c.key || typeof d.prompt !== 'string' || d.prompt.length > 500000) { reply({type:'papersim:writing-error',error:'请检查模型配置与文本长度（上限50万字符）'}); return; }
-  writingBusy=true;
-  try {
-    const before=await refreshBalance(true);
-    const text=await c.chatText(d.prompt);
-    if (owner !== billingIdentity()) { reply({type:"papersim:writing-result",text,usage:c.usage}); return; }
-    showUsage({calls:usage.calls+c.usage.calls,input:usage.input+c.usage.input,output:usage.output+c.usage.output,cached:usage.cached+c.usage.cached,embed:usage.embed+c.usage.embed});
-    reply({type:'papersim:writing-result',text,usage:c.usage});
-    await settleBilling(before,null,billingGeneration);
-  } catch(err) { reply({type:'papersim:writing-error',error:err.message}); }
-  finally { writingBusy=false; }
-});
-document.querySelector('#writingLink').addEventListener('click',()=>{document.querySelector('#writingEnabled').checked=true;});
-
-document.querySelector("#writingEnabled").addEventListener("change",e=>{if(e.target.checked)window.open("writing.html","_blank");});

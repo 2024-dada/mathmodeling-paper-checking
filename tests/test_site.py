@@ -104,3 +104,9 @@ console.log(JSON.stringify([
 """, encoding="utf-8")
     out = json.loads(subprocess.run(["node", str(script)], capture_output=True, text=True, check=True).stdout)
     assert out == [{"a": [1]}, {"logic": []}, "The mixed system is fastest.", "The combined system finishes in 101 years", None]
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="需要 node")
+def test_writing_guidance_contracts():
+    subprocess.run(["node", "--test", str(ROOT / "tests/writing-guidance.test.mjs")],
+                   capture_output=True, text=True, encoding="utf-8", check=True)

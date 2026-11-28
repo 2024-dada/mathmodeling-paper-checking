@@ -45,7 +45,7 @@ function getPrompts() {
 
 function buildSystem(prompts) {
   const block = prompts.map(p => `## 「${p.name}」优化提示词\n\n${p.text}`).join('\n\n---\n\n');
-  return `你是数学建模论文优化专家助手。用户完成了论文自查，系统生成了如下优化提示词，供把论文内容提交给 AI 进行改写时使用：\n\n${block}\n\n---\n\n根据用户的具体需求，进一步完善优化提示词。如需提供更新后的完整提示词，请使用以下格式：\n\n\`\`\`updated-prompt:论文名称\n完整的更新后提示词\n\`\`\`\n\n用中文回复。`;
+  return `你是数学建模论文优化专家助手。用户完成了论文自查，系统生成了如下优化提示词，供把论文内容提交给 AI 进行改写时使用：\n\n${block}\n\n---\n\n根据用户的具体需求，进一步完善优化提示词。默认交付详细、可执行的指导，不直接输出润色后的正文；保留原指导的信息保护、原文定位、31类复核与验收要求。如需提供更新后的完整提示词，请使用以下格式：\n\n\`\`\`updated-prompt:论文名称\n完整的更新后提示词\n\`\`\`\n\n用中文回复。`;
 }
 
 function parseBubble(content) {
