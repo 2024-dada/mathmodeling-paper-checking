@@ -1,4 +1,4 @@
-import { loadWritingResources, generateWritingGuidance } from "./writing-guidance.js";
+import { loadWritingResources, generateWritingGuidance } from "./writing-guidance.js?v=quote-recovery1";
 
 // papersim 浏览器端引擎：与 Python 版 papersim 算法一致（抽取清洗、重复率、防御性语言率、优化提示词）。
 // 浏览器和 Node 都可以 import。
@@ -718,7 +718,7 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
     }
   }
   await log("生成优化提示词…");
-  const prompts = [], suggestions = [];
+  const prompts = [], suggestions = [], writing = Array(k).fill(null);
   for (let i = 0; i < k; i++) {
     prompts.push(buildPrompt(docs[i], dup[i], dfn[i], lex, { level: opt.level ?? null, targetSummary: opt.targetSummary ?? 0.1, targetBody: opt.targetBody ?? 0.08, embedText: !!opt.embedText }));
     if (audits[i]) {
@@ -730,7 +730,7 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
     if (opt.polish) {
       await log(`生成学术润色指导提示词 ${i + 1}/${k}：${docs[i].name}（不直接改写正文）`);
       prompts[i] = await generateWritingGuidance(docs[i], client, writingResources, {
-        locateQuote, diagnostics: { duplication: dup[i] ? { rate: dup[i].total, pairs: dup[i].pairs.slice(0, 15) } : null,
+        locateQuote, onValidation: summary => { writing[i] = summary; }, diagnostics: { duplication: dup[i] ? { rate: dup[i].total, pairs: dup[i].pairs.slice(0, 15) } : null,
           defensive: dfn[i] ? { rate: dfn[i].rate, hits: dfn[i].hits.slice(0, 20).map(h => h.text) } : null, audits: audits[i] }
       });
       advance();
@@ -742,5 +742,5 @@ export async function run({ docs, corpus = [], exclude = [], lex, opt = {}, clie
     } else suggestions.push(null);
   }
   await log("检测计算完成，正在整理报告…");
-  return { docs, dup, dfn, audits, prompts, suggestions };
+  return { docs, dup, dfn, audits, writing, prompts, suggestions };
 }

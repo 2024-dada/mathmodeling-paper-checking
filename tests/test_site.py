@@ -108,5 +108,6 @@ console.log(JSON.stringify([
 
 @pytest.mark.skipif(not shutil.which("node"), reason="需要 node")
 def test_writing_guidance_contracts():
-    subprocess.run(["node", "--test", str(ROOT / "tests/writing-guidance.test.mjs")],
+    subprocess.run(["node", "--test", str(ROOT / "tests/writing-guidance.test.mjs"),
+                    str(ROOT / "tests/writing-guidance-recovery.test.mjs")],
                    capture_output=True, text=True, encoding="utf-8", check=True)

@@ -44,10 +44,11 @@ test('checked option makes one guidance call, never rewrites or mutates the sour
  assert.match(out.prompts[0],/学术润色指导提示词/);assert.match(out.prompts[0],/验收条件/);assert.match(out.prompts[0],/31\. 套话收尾/);assert.match(out.prompts[0],/不保证一次完美/);
  assert.deepEqual(progress.at(-1),[2,2]);
 });
-test('model is required; invented quotations and incomplete responses are rejected',async()=>{
+test('model is required; invented quotations are excluded and incomplete responses rejected',async()=>{
  await assert.rejects(run({docs:[doc],lex:lex(),opt:{only:'none',polish:true}}),/需要填写 API Key/);
  const bad=fixture();bad.issues[0].quote='这句话从未出现在论文中';
- await assert.rejects(generateWritingGuidance(doc,{chatMessagesJSON:async()=>bad},resources,{locateQuote}),/无法定位/);
+ const safe=await generateWritingGuidance(doc,{chatMessagesJSON:async()=>bad},resources,{locateQuote});
+ assert.match(safe,/未定位/);assert.doesNotMatch(safe,/这句话从未出现在论文中/);
  await assert.rejects(generateWritingGuidance(doc,{chatMessagesJSON:async()=>({})},resources,{locateQuote}),/未返回完整/);
  const incomplete=fixture();incomplete.issues[0].acceptance='';
  await assert.rejects(generateWritingGuidance(doc,{chatMessagesJSON:async()=>incomplete},resources,{locateQuote}),/缺少定位/);

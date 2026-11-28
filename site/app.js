@@ -1,4 +1,4 @@
-import * as E from "./engine.js";
+import * as E from "./engine.js?v=quote-recovery1";
 import { pdfToText } from "./pdftext.js";
 import { reportPdf } from "./reportpdf.js";
 import { docxToText } from "./docxtext.js";
@@ -529,7 +529,7 @@ function paperCard(r, k) {
   const tabs = [["prompt", r.settings.polish ? "学术润色指导提示词" : "优化提示词"], ...(f ? [["defs", `防御句 ${f.hits.length}`]] : []), ...(d ? [["pairs", `相似句 ${d.pairs.length}`], ["full", "重复高亮"]] : [])];
   return `<section class="card paper" data-k="${k}">
     <h3>${esc(doc.name)}</h3><div class="meta">${doc.nWords} 词 · ${doc.sentences.length} 句</div>
-    <div class="metrics">${dupBox}${defBox}</div>${auditPanel(r.audits?.[k])}
+    <div class="metrics">${dupBox}${defBox}</div>${auditPanel(r.audits?.[k])}${writingPanel(r.writing?.[k])}
     <div class="tabs">${tabs.map(([id, t], i) => `<button data-t="${id}" class="${i ? "" : "on"}">${t}</button>`).join("")}</div>
     <div class="pane on" data-p="prompt">${r.settings.polish ? '<p class="hint">已结合三套资料生成论文专属指导。复制本提示词并另附原文交给模型执行；正文未被修改。支持在下方继续对话完善指导，或随报告导出 PDF。</p>' : ""}<div class="acts"><button class="btn sm cp">复制提示词</button><button class="btn sm dl">下载 .md</button></div><textarea class="prompt" readonly>${esc(p)}</textarea></div>
     ${f ? `<div class="pane" data-p="defs">${f.hits.length ? [...f.hits].sort((a, b) => b.score - a.score).map(h => `<div class="sent"><div class="t">${h.index < doc.summaryCutoff ? "摘要" : "正文"} · ${h.categories.map(c => cats[c].label).join("、")} · 得分 ${h.score}</div>${highlightDef(h.text, h.matches)}</div>`).join("") : `<div class="none">没有检出防御性句</div>`}
@@ -537,6 +537,10 @@ function paperCard(r, k) {
     ${d ? `<div class="pane" data-p="pairs">${d.pairs.length ? d.pairs.map(([s, a, src, b]) => `<div class="pair"><span class="s">${pct(s, 0)}</span> · 来源 ${esc(src)}<br>本文：${esc(a)}<br>来源：${esc(b)}</div>`).join("") : `<div class="none">没有相似句</div>`}</div>
       <div class="pane" data-p="full"><div class="legend"><span><i style="background:rgba(255,60,142,.6)"></i>逐字重复</span><span><i style="background:rgba(255,176,0,.55)"></i>改写相似</span><span><i style="background:rgba(143,92,255,.5)"></i>赛题原文</span></div><div class="fulltext">${highlightDup(doc.text, d.spans)}</div></div>` : ""}
   </section>`;
+}
+function writingPanel(summary) {
+  if (!summary?.rejected) return "";
+  return `<section class="paper-audits" role="status"><h4>润色指导 · 引用校验说明</h4><p>已保留 ${summary.verified} 条可定位的具体指导；另有 ${summary.rejected} 条模型引用未定位，已排除对应问题项，不影响本次检测完成。${summary.verified ? "" : "本次仅提供总体指导和验收清单，不代表论文没有问题。"}</p></section>`;
 }
 function auditPanel(audit) {
   if (!audit) return "";
@@ -600,7 +604,7 @@ $("#dlCsv").onclick = () => {
 };
 $("#dlJson").onclick = () => {
   if (!last) return;
-  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], audits: last.audits?.[i], settings: last.settings, prompt: last.prompts[i], usage: last.usage, account: last.accountText }));
+  const out = last.docs.map((d, i) => ({ name: d.name, words: d.nWords, sentences: d.sentences.length, duplication: last.dup[i], defensive: last.dfn[i], audits: last.audits?.[i], writing: last.writing?.[i], settings: last.settings, prompt: last.prompts[i], usage: last.usage, account: last.accountText }));
   download(`papersim_${stamp()}.json`, JSON.stringify(out, null, 1), "application/json");
 };
 $("#dlReport").onclick = () => {
@@ -684,7 +688,7 @@ function toRecord(r) {
   return {
     time: r.runTime || Date.now(), settings: r.settings, targets: r.targets, accountText: r.accountText || "",
     docs: r.docs.map(d => ({ name: d.name, text: d.text, sentences: d.sentences, summaryCutoff: d.summaryCutoff, nWords: d.nWords })),
-    dup: r.dup, dfn: r.dfn, audits: r.audits || null, prompts: r.prompts,
+    dup: r.dup, dfn: r.dfn, audits: r.audits || null, writing: r.writing || null, prompts: r.prompts,
   };
 }
 async function saveHistory(r) {
