@@ -1,3 +1,5 @@
+import { extractTermDefinitions, preferChineseTerms } from "./writing-quality.js?v=restraint5";
+
 export function calendarDatesIn(text) {
   return [...text.matchAll(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g)].map(m=>{
     const [y,month,day]=m.slice(1).map(Number),d=new Date(Date.UTC(y,month-1,day));
@@ -57,7 +59,7 @@ export function buildWritingContext(doc,{now=new Date(),timeZone}={}) {
     return {...date,referenceId:references.find(r=>r.text.includes(m[1]))?.id||null,
       relation:!date.valid?'invalid':date.value<clock.date?'past':date.value===clock.date?'today':'future'};
   });
-  return {source,bodyText,clock,accessDateChecks,sourceFormat:doc.sourceFormat||'text',hasFullSource:!!doc.sourceText,sections,references,abstract,
+  return {source,bodyText,clock,accessDateChecks,termDefinitions:extractTermDefinitions(source),sourceFormat:doc.sourceFormat||'text',hasFullSource:!!doc.sourceText,sections,references,abstract,
     extraction:doc.extraction||null,visualVerified:false,
     limits:'章节和文献索引只描述输入中实际存在的文字，不证明外部文献真实或引文支持论断；未对PDF原稿、图表或排版作视觉核验。'};
 }
@@ -97,7 +99,9 @@ export function checkAbbreviationIssue(item,context) {
   const compact=s=>s.replace(/\s+/g,'');
   const source=compact(context.source),isAbstract=/摘要/.test(item.problem),scope=compact(isAbstract?context.abstract:context.bodyText);
   if(!scope||!Array.isArray(item.terms)||!item.terms.length)return {review:true};
-  const terms=item.terms;
+  const terms=preferChineseTerms(item.terms,context,scope);
+  const chineseAbstract=isAbstract&&(scope.match(/\p{Script=Han}/gu)||[]).length>(scope.match(/[A-Za-z]+/g)||[]).length;
+  if(chineseAbstract&&terms.some(t=>t&&typeof t.fullName==='string'&&!/\p{Script=Han}/u.test(t.fullName)))return {review:true};
   if(!terms.every(t=>t&&typeof t.abbreviation==='string'&&/^[A-Za-z][A-Za-z0-9-]{1,15}$/.test(t.abbreviation)&&typeof t.fullName==='string'&&t.fullName.trim()&&source.includes(compact(t.fullName))&&scope.includes(t.abbreviation)))return {review:true};
   const esc=s=>s.replace(/[.*+?^$()|[\]\\]/g,'\\$&');
   const unbound=terms.filter(t=>{

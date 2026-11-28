@@ -113,5 +113,6 @@ def test_writing_guidance_contracts():
                     str(ROOT / "tests/writing-context.test.mjs"),
                     str(ROOT / "tests/pdf-reading-order.test.mjs"),
                     str(ROOT / "tests/writing-style.test.mjs"),
-                    str(ROOT / "tests/writing-date-definitions.test.mjs")],
+                    str(ROOT / "tests/writing-date-definitions.test.mjs"),
+                    str(ROOT / "tests/writing-restraint.test.mjs")],
                    capture_output=True, text=True, encoding="utf-8", check=True)
