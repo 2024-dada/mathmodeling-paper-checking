@@ -330,7 +330,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
             <label class="check"><input type="checkbox" data-check="def"><span>防御性语言<small>本地词典分析，不消耗 API</small></span></label>
             <label class="check"><input type="checkbox" data-check="logic"><span>论文逻辑检查<small>模型检查推导、约束和结论，列出原文依据</small></span></label>
             <label class="check"><input type="checkbox" data-check="hallucination"><span>幻觉风险检查<small>模型标出待核实的数据、引文与事实；不等同于查证真伪</small></span></label>
-            <label class="check"><input type="checkbox" data-check="polish"><span>学术润色指导提示词<small>结合 Humanizer 31 类检查、学术写作与 GPT Academic 基础提示词，生成详细修改指令，不直接改写正文；每篇论文增加模型请求</small></span></label>
+            <label class="check"><input type="checkbox" data-check="polish"><span>学术润色指导提示词<small>结合 Humanizer 31 类检查、学术写作与 GPT Academic 基础提示词，强调问题、方法、结果与依据，区分必要修正和可选优化；生成指导，不直接改稿</small></span></label>
           </div>
           <div class="hint">前两项在浏览器本地完成，不花钱。逻辑、幻觉风险和学术润色指导需要填写 API Key 并选择模型，论文内容会发送给所选服务商。</div>
         </div>
@@ -472,7 +472,7 @@ footer code{font:12px var(--mono);color:var(--cyan);background:rgba(45,226,230,.
   <div class="appearance-footer"><button class="btn" data-reset-appearance>恢复默认</button><button class="btn primary" data-appearance-done>完成</button></div>
 </dialog>
 <script type="module" src="scene.js?v=1"></script>
-<script type="module" src="app.js?v=context-review2"></script>
+<script type="module" src="app.js?v=academic-style3"></script>
   
 <script type="module" src="chat.js?v=1"></script>
 

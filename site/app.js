@@ -1,5 +1,5 @@
-import * as E from "./engine.js?v=context-review2";
-import { pdfToText } from "./pdftext.js?v=context-review2";
+import * as E from "./engine.js?v=academic-style3";
+import { pdfToText } from "./pdftext.js?v=academic-style3";
 import { reportPdf } from "./reportpdf.js";
 import { docxToText } from "./docxtext.js";
 
@@ -542,7 +542,7 @@ function paperCard(r, k) {
 function writingPanel(summary) {
   if (!summary) return "";
   const contextRejected = summary.contextRejected || 0, review = (summary.needsVisualReview || 0) + (summary.needsContentReview || 0);
-  return `<section class="paper-audits" role="status"><h4>润色指导 · 建议校验说明</h4><p>${summary.verified} 条建议可定位，未发现已检查的上下文冲突；这不代表建议全部正确。${summary.rejected ? `另有 ${summary.rejected} 条引用未定位，已排除对应问题。` : ""}${contextRejected ? `已排除 ${contextRejected} 条与已提供章节或文献信息冲突的建议。` : ""}${review ? `${review} 条涉及版式、完整性或术语上下文的疑问仅列为待核对，不作为改稿指令。` : ""}</p></section>`;
+  return `<section class="paper-audits" role="status"><h4>润色指导 · 建议校验说明</h4><p>${summary.verified} 条建议可定位，${summary.required != null ? `其中 ${summary.required} 条标为必要修正、${summary.optional} 条为可选优化；` : ""}未发现已检查的上下文冲突；这不代表建议全部正确。${summary.rejected ? `另有 ${summary.rejected} 条引用未定位，已排除对应问题。` : ""}${contextRejected ? `已排除 ${contextRejected} 条与已提供章节或文献信息冲突的建议。` : ""}${review ? `${review} 条涉及版式、完整性或术语上下文的疑问仅列为待核对，不作为改稿指令。` : ""}</p></section>`;
 }
 function auditPanel(audit) {
   if (!audit) return "";

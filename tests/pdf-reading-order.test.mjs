@@ -21,3 +21,13 @@ test('single-column prose and full-width lines keep their order',async()=>{
  const items=[item('第一段完整的单栏正文覆盖页面中央',50,700,490),item('第二段完整的单栏正文覆盖页面中央',50,680,490)];
  assert.equal(await pdfToText(fake([items]),new Uint8Array()),items.map(x=>x.str).join('\n'));
 });
+
+test('superscript citation belongs to its body line rather than the previous column',async()=>{
+ const items=[];
+ for(let i=0;i<6;i++)items.push(item(i===5?'WHO与UNEP报告':'左栏正文内容'+i,50,700-i*20),item(i===0?'和一篇新闻报道':'右栏正文内容'+i,330,700-i*20));
+ items.find(x=>x.str==='和一篇新闻报道').width=80;
+ items.push(item('[1-5]',412,705,20,6),item('。后续说明',434,700,110));
+ const text=await pdfToText(fake([items]),new Uint8Array());
+ assert.match(text,/和一篇新闻报道\s*\[1-5\]\s*。后续说明/);
+ assert.doesNotMatch(text,/WHO与UNEP报告\s*\[1-5\]/);
+});

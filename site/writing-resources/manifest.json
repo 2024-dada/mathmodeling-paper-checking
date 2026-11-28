@@ -15,7 +15,12 @@
     {
       "file": "academic-core-source.txt",
       "sha256": "2c59f3c69519bd1333c7cd01b7ef0c7c87f50703f044c660c1748d454b84c50c"
+    },
+    {
+      "file": "../writing-style.js",
+      "sha256": "326726508607f98253afe31391c134e7ee2953e11a8077233dbd87b2a05e4f5d"
     }
   ],
-  "hashFormat": "SHA-256 of UTF-8 text with LF line endings"
+  "hashFormat": "SHA-256 of UTF-8 text with LF line endings",
+  "academicStyleRules": 12
 }

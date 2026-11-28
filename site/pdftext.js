@@ -5,8 +5,24 @@ function makeRows(items) {
     const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
     let row = rows.find(r => Math.abs(r.y-y) < Math.max(2,h*0.45));
     if (!row) { row={y,h,items:[]}; rows.push(row); }
-    row.items.push({x,w:it.width,s:it.str});
+    row.items.push({x,y,h,w:it.width,s:it.str});
   }
+  // 上标引文按水平邻接关系归回正文基线，不让它在分栏后跑到上一段。
+  for (const row of rows) for (const citation of [...row.items]) {
+    if (!/^\s*\[\d+(?:\s*[-,，;；:：]\s*\d+)*\]\s*$/.test(citation.s)) continue;
+    let target = null, best = Infinity;
+    for (const candidate of rows) {
+      if (candidate === row || citation.h > candidate.h * 0.82) continue;
+      const rise = citation.y - candidate.y;
+      if (rise <= 0 || rise > candidate.h * 0.85) continue;
+      const gap = Math.min(...candidate.items.map(it => Math.min(Math.abs(citation.x-it.x-it.w), Math.abs(it.x-citation.x-citation.w))));
+      if (gap > candidate.h * 0.9) continue;
+      const score = gap + rise;
+      if (score < best) { target = candidate; best = score; }
+    }
+    if (target) { row.items.splice(row.items.indexOf(citation),1); target.items.push(citation); }
+  }
+  for (let i=rows.length-1;i>=0;i--) if(!rows[i].items.length) rows.splice(i,1);
   rows.sort((a,b)=>b.y-a.y);
   rows.forEach(r=>r.items.sort((a,b)=>a.x-b.x));
   return rows;

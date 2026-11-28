@@ -71,3 +71,11 @@ export function checkAbbreviationIssue(item,context) {
     instruction:'在摘要已有全称处核对并标注以下对应关系：'+unbound.map(t=>t.fullName+'（'+t.abbreviation+'）').join('、')+'。仅在对应关系确认且目标格式需要时标注；后续沿用缩写，不重复增加全称或改写科学内容。',
     acceptance:'摘要已有全称与缩写对应清楚，无重复展开；正文定义和物质、术语含义保持一致。'}};
 }
+
+export function checkCitationStyleIssue(item,context) {
+  if(!/不统一|不一致/.test(item.problem)||!/引用|引文|页码/.test(item.problem))return false;
+  const id=(item.quote+' '+item.problem).match(/\[(\d+)[:：]\s*\d/)?.[1];
+  if(!id)return false;
+  const body=context.source.split(/\n\s*(?:参考文献|References|Bibliography)\s*\n/i)[0];
+  return body.includes('['+id+']')&&new RegExp('\\['+id+'[:：]\\s*\\d').test(body);
+}
