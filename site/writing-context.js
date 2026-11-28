@@ -1,5 +1,32 @@
-export function buildWritingContext(doc) {
+export function calendarDatesIn(text) {
+  return [...text.matchAll(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/g)].map(m=>{
+    const [y,month,day]=m.slice(1).map(Number),d=new Date(Date.UTC(y,month-1,day));
+    return {raw:m[0],value:String(y).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0'),
+      valid:d.getUTCFullYear()===y&&d.getUTCMonth()===month-1&&d.getUTCDate()===day};
+  });
+}
+function calendarClock(now,timeZone) {
+  const formatter=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit'});
+  const parts=Object.fromEntries(formatter.formatToParts(now).map(p=>[p.type,p.value]));
+  return {date:parts.year+'-'+parts.month+'-'+parts.day,timeZone:formatter.resolvedOptions().timeZone,source:'浏览器本机时间，未联网校时'};
+}
+export function checkDateClaim(text,context) {
+  const claim=text.replace(/(?:并非|不是|不属于|非)未来日期|不晚于(?:当前|今天|现在|今日)/g,'');
+  if(!/未来日期|晚于(?:当前|今天|现在|今日|本日)|尚未到|日期.{0,8}在未来/.test(claim))return null;
+  let dates=calendarDatesIn(text).filter(x=>x.valid).map(x=>x.value);
+  if(!dates.length){const ids=[...text.matchAll(/\[(\d+)\]/g)].map(m=>m[1]);dates=context.accessDateChecks.filter(x=>ids.includes(x.referenceId)&&x.relation!=='invalid').map(x=>x.value);}
+  if(!dates.length)return null;
+  return dates.every(x=>x<=context.clock.date)?'contradiction':'future';
+}
+export function forcedDefinitionDeletion(text) {
+  text=text.replace(/(?:不应|不要|不能|不得|不必|无需|禁止)\s*(?:强制|机械地?|一概)?\s*(?:删除|去掉|删去)(?:后文|正文|后续章节).{0,12}(?:定义|括注|英文全称)/g,'')
+    .replace(/(?:不要求|不强制)(?:摘要和|摘要与)?(?:正文|后文).{0,12}不重复定义/g,'');
+  return /(?:正文|后文|后续章节|3\.\d+).{0,30}(?:不重复定义|应改为仅使用缩写|删除重复括注)|(?:删除|去掉|删去)(?:后文|正文|后续章节).{0,12}(?:定义|括注|英文全称)/.test(text);
+}
+
+export function buildWritingContext(doc,{now=new Date(),timeZone}={}) {
   const source = doc.sourceText || doc.text;
+  const clock=calendarClock(now,timeZone);
   const lines=source.split(/\r?\n|\f/).map(s=>s.trim()).filter(s=>s&&!/^\d+$/.test(s));
   const refAt=lines.findIndex(s=>/^(参考文献|References|Bibliography)$/i.test(s));
   const body=refAt<0?lines:lines.slice(0,refAt),sections=[];
@@ -22,7 +49,15 @@ export function buildWritingContext(doc) {
     ref.basicFieldsPresent=ref.present.year&&ref.present.source&&(ref.type==='J'?ref.present.pages:ref.type==='N'?ref.present.date:false);
   }
   const abstract=source.match(/(?:摘要|Abstract)\s*[:：]([\s\S]*?)(?:关键词|Keywords?)\s*[:：]/i)?.[1].trim()||'';
-  return {source,sourceFormat:doc.sourceFormat||'text',hasFullSource:!!doc.sourceText,sections,references,abstract,
+  const firstSection=body.findIndex(s=>/^\d{1,2}(?:\.\d+)*\s+\S|^[一二三四五六七八九十]+[、．.]\s*\S|^(?:引言|Introduction)$/i.test(s));
+  const keywordLine=body.findIndex(s=>/^(?:关键词|Keywords?)\s*[:：]/i.test(s));
+  const bodyText=(firstSection>=0?body.slice(firstSection):keywordLine>=0?body.slice(keywordLine+1):abstract?[]:body).join('\n');
+  const accessDateChecks=[...source.matchAll(/[\[［]\s*(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\s*[\]］]/g)].map(m=>{
+    const date=calendarDatesIn(m[1])[0];
+    return {...date,referenceId:references.find(r=>r.text.includes(m[1]))?.id||null,
+      relation:!date.valid?'invalid':date.value<clock.date?'past':date.value===clock.date?'today':'future'};
+  });
+  return {source,bodyText,clock,accessDateChecks,sourceFormat:doc.sourceFormat||'text',hasFullSource:!!doc.sourceText,sections,references,abstract,
     extraction:doc.extraction||null,visualVerified:false,
     limits:'章节和文献索引只描述输入中实际存在的文字，不证明外部文献真实或引文支持论断；未对PDF原稿、图表或排版作视觉核验。'};
 }
@@ -35,6 +70,7 @@ function sectionId(s) {
   return String(digits[s]||s);
 }
 export function guidanceDisposition(text,context,category='language') {
+  if(checkDateClaim(text,context)==='contradiction')return 'contradiction';
   const ids=[];
   for(const m of text.matchAll(/(?:缺少|缺失|缺|遗漏|未见|没有|不存在|是否存在)\s*(?:了|的)?\s*第?\s*(\d+(?:\.\d+)*|[一二三四五六七八九十]{1,3})\s*[节章]/g))ids.push(sectionId(m[1]));
   for(const m of text.matchAll(/第\s*(\d+(?:\.\d+)*|[一二三四五六七八九十]{1,3})\s*[节章].{0,6}(?:缺失|缺少|不存在|是否存在)/g))ids.push(sectionId(m[1]));
@@ -57,19 +93,24 @@ export function guidanceDisposition(text,context,category='language') {
 }
 
 export function checkAbbreviationIssue(item,context) {
-  if(!/摘要/.test(item.problem)||!/全称|缩写/.test(item.problem)||!/(?:缺少|未给|未提供|未出现|未定义|没有)/.test(item.problem))return {item};
+  if(!/全称|缩写/.test(item.problem)||!/(?:缺少|未给|未提供|未出现|未定义|没有|未解释|先用|首次|绑定|重复定义)/.test(item.problem))return {item};
   const compact=s=>s.replace(/\s+/g,'');
-  const source=compact(context.source),abstract=compact(context.abstract);
-  if(!Array.isArray(item.terms)||!item.terms.length)return {review:true};
+  const source=compact(context.source),isAbstract=/摘要/.test(item.problem),scope=compact(isAbstract?context.abstract:context.bodyText);
+  if(!scope||!Array.isArray(item.terms)||!item.terms.length)return {review:true};
   const terms=item.terms;
-  if(!terms.every(t=>t&&typeof t.abbreviation==='string'&&/^[A-Za-z][A-Za-z0-9-]{1,15}$/.test(t.abbreviation)&&typeof t.fullName==='string'&&t.fullName.trim()&&source.includes(compact(t.fullName))&&abstract.includes(t.abbreviation)))return {review:true};
-  const prior=terms.every(t=>abstract.indexOf(compact(t.fullName))>=0&&abstract.indexOf(compact(t.fullName))<abstract.indexOf(t.abbreviation));
-  if(!prior)return {review:true};
-  const unbound=terms.filter(t=>!abstract.includes(compact(t.fullName)+'（'+t.abbreviation+'）')&&!abstract.includes(compact(t.fullName)+'('+t.abbreviation+')'));
+  if(!terms.every(t=>t&&typeof t.abbreviation==='string'&&/^[A-Za-z][A-Za-z0-9-]{1,15}$/.test(t.abbreviation)&&typeof t.fullName==='string'&&t.fullName.trim()&&source.includes(compact(t.fullName))&&scope.includes(t.abbreviation)))return {review:true};
+  const esc=s=>s.replace(/[.*+?^$()|[\]\\]/g,'\\$&');
+  const unbound=terms.filter(t=>{
+    const binding=new RegExp(esc(compact(t.fullName))+'[（(][^（）()]{0,160}'+esc(t.abbreviation)+'[^（）()]{0,30}[）)]').exec(scope);
+    const first=scope.indexOf(t.abbreviation);
+    return !binding||binding.index>first||binding.index+binding[0].length<first+t.abbreviation.length;
+  });
   if(!unbound.length)return {contradiction:true};
-  return {item:{...item,problem:'摘要前文已有相关全称；应核对全称与缩写是否在首次介绍时明确对应，不能称为全文未给全称。',
-    instruction:'在摘要已有全称处核对并标注以下对应关系：'+unbound.map(t=>t.fullName+'（'+t.abbreviation+'）').join('、')+'。仅在对应关系确认且目标格式需要时标注；后续沿用缩写，不重复增加全称或改写科学内容。',
-    acceptance:'摘要已有全称与缩写对应清楚，无重复展开；正文定义和物质、术语含义保持一致。'}};
+  const prior=unbound.some(t=>scope.indexOf(compact(t.fullName))>=0&&scope.indexOf(compact(t.fullName))<scope.indexOf(t.abbreviation));
+  return {item:{...item,necessity:'optional',
+    problem:(prior?'相关中文全称已在当前阅读范围中出现；':'需结合当前阅读范围核对术语对应；')+'首次介绍时明确全称与缩写的对应属于可选清晰度优化，不据此要求摘要与正文只定义一次。',
+    instruction:'分别核对摘要与正文，仅在对应关系确认且确有阅读需要时，在已有全称处绑定缩写，或在尚未说明的缩写首次使用处补入本文已有的全称：'+unbound.map(t=>t.fullName+'（'+t.abbreviation+'）').join('、')+'。保留后文英文全称、物质说明和有信息的定义，不机械要求后文仅使用缩写，不增添未经证实的术语。',
+    acceptance:'各阅读范围中术语对应清楚，不重复堆砌全称；摘要与正文可按需要分别定义，后文英文全称和必要说明保留，信息与引用关系不变。'}};
 }
 
 export function checkCitationStyleIssue(item,context) {

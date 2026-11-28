@@ -1,4 +1,4 @@
-import { loadWritingResources, generateWritingGuidance } from "./writing-guidance.js?v=academic-style3";
+import { loadWritingResources, generateWritingGuidance } from "./writing-guidance.js?v=date-scope4";
 
 // papersim 浏览器端引擎：与 Python 版 papersim 算法一致（抽取清洗、重复率、防御性语言率、优化提示词）。
 // 浏览器和 Node 都可以 import。
