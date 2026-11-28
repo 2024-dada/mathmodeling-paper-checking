@@ -1,0 +1,5 @@
+Humanizer-zh: https://github.com/op7418/Humanizer-zh
+Academic prompts: https://github.com/Leey21/awesome-ai-research-writing
+GPT Academic: https://github.com/binary-husky/gpt_academic
+GPT Academic prompt snapshot and original source: GPL-3.0; see accompanying license.
+Local skill adapters are included as reference material.

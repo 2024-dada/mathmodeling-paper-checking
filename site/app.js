@@ -718,7 +718,7 @@ async function renderHistory() {
   box.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await idbReq((await histStore("readwrite")).delete(+b.dataset.del)); renderHistory(); });
 }
 async function viewHistory(id) {
-  if (detecting) { toast("检测进行中，完成后再查看历史"); return; }
+  if (detecting || writingBusy) { toast("检测或润色进行中，完成后再查看历史"); return; }
   const rec = await idbReq((await histStore("readonly")).get(id));
   if (!rec) { renderHistory(); return; }
   await lexReady;
@@ -748,3 +748,38 @@ window.addEventListener("papersim:prompt-updated", async e => {
   } catch (err) { console.error("同步更新历史提示词失败", err); }
 });
 renderHistory();
+
+
+// 独立润色页通过同源消息复用当前配置，密钥保留在主页面内存。
+const writingWindows = new Map();
+let writingBusy = false;
+window.addEventListener('message', async e => {
+  if (e.origin !== location.origin || !e.source || !e.data?.session) return;
+  const d = e.data;
+  if (d.type === 'papersim:writing-connect') {
+    // 只接受由本页面打开、同源且具有指定路径的工作台。
+    try { if (e.source.opener !== window || new URL(e.source.location.href).pathname !== new URL('writing.html',location.href).pathname) return; } catch { return; }
+    writingWindows.set(e.source,d.session);
+    e.source.postMessage({type:'papersim:writing-ready',session:d.session,ready:!!client(false)},location.origin);
+    return;
+  }
+  if (d.type !== 'papersim:writing-run' || writingWindows.get(e.source) !== d.session) return;
+  const reply = x => e.source.postMessage({session:d.session,id:d.id,...x},location.origin);
+  if (writingBusy || detecting) { reply({type:'papersim:writing-error',error:'已有任务正在处理，请稍后重试'}); return; }
+  const c = client(false);
+  const owner = billingIdentity();
+  if (!c || !c.key || typeof d.prompt !== 'string' || d.prompt.length > 500000) { reply({type:'papersim:writing-error',error:'请检查模型配置与文本长度（上限50万字符）'}); return; }
+  writingBusy=true;
+  try {
+    const before=await refreshBalance(true);
+    const text=await c.chatText(d.prompt);
+    if (owner !== billingIdentity()) { reply({type:"papersim:writing-result",text,usage:c.usage}); return; }
+    showUsage({calls:usage.calls+c.usage.calls,input:usage.input+c.usage.input,output:usage.output+c.usage.output,cached:usage.cached+c.usage.cached,embed:usage.embed+c.usage.embed});
+    reply({type:'papersim:writing-result',text,usage:c.usage});
+    await settleBilling(before,null,billingGeneration);
+  } catch(err) { reply({type:'papersim:writing-error',error:err.message}); }
+  finally { writingBusy=false; }
+});
+document.querySelector('#writingLink').addEventListener('click',()=>{document.querySelector('#writingEnabled').checked=true;});
+
+document.querySelector("#writingEnabled").addEventListener("change",e=>{if(e.target.checked)window.open("writing.html","_blank");});
